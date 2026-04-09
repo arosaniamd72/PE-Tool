@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PE Workup · Wells + PERC + D-Dimer iLR</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+:root {
+  --bg: #0a0e14;
+  --s1: #111720;
+  --s2: #171e2a;
+  --s3: #1c2535;
+  --border: #243047;
+  --border2: #2e3d55;
+  --gold: #c9943a;
+  --gold2: #e8b96a;
+  --blue: #4d9de0;
+  --red: #e05a5a;
+  --green: #4caf82;
+  --yellow: #d4a94a;
+  --text: #dde4ef;
+  --muted: #6e8099;
+  --faint: #2e3d55;
+  --step-done: #4caf82;
+  --step-active: #c9943a;
+  --step-todo: #2e3d55;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  padding: 0 0 80px;
+}
+
+/* ── HEADER ── */
+.masthead {
+  background: linear-gradient(180deg, #0d1520 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 36px 28px 28px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.masthead-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.masthead h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(30px, 5vw, 50px);
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.05;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.masthead h1 em { color: var(--gold); font-style: normal; }
+
+.masthead-sub {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 560px;
+}
+
+/* ── STEP TRACKER ── */
+.step-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--s1);
+}
+
+.step-tab {
+  flex: 1;
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.step-tab:hover { background: rgba(255,255,255,0.02); }
+
+.step-tab.active {
+  border-bottom-color: var(--gold);
+  background: rgba(201,148,58,0.04);
+}
+
+.step-tab.done { border-bottom-color: var(--green); }
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 9px;
+  margin-bottom: 4px;
+  background: var(--faint);
+  color: var(--muted);
+  transition: all 0.2s;
+}
+
+.step-tab.active .step-num { background: var(--gold); color: #000; }
+.step-tab.done .step-num { background: var(--green); color: #000; }
+
+.step-name {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.step-tab.active .step-name { color: var(--gold); }
+.step-tab.done .step-name { color: var(--green); }
+
+.step-score {
+  font-size: 10px;
+  color: var(--muted);
+  display: block;
+  min-height: 14px;
+}
+
+/* ── PANELS ── */
+.panels-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 28px;
+}
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+
+.card-hd {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-hd::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── CHECKLIST ── */
+.checklist { display: flex; flex-direction: column; gap: 6px; }
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--s2);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.check-item:hover { border-color: var(--border2); background: var(--s3); }
+.check-item.checked { border-color: var(--gold); background: rgba(201,148,58,0.06); }
+
+.check-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-size: 10px;
+}
+
+.check-item.checked .check-box {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #000;
+}
+
+.check-label { flex: 1; font-size: 11px; line-height: 1.4; color: var(--text); }
+.check-pts {
+  font-size: 11px;
+  color: var(--gold2);
+  font-style: italic;
+  flex-shrink: 0;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ── SCORE RESULT ── */
+.score-result {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background: var(--s2);
+  margin-bottom: 16px;
+}
+
+.score-big {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 52px;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.score-meta { flex: 1; }
+.score-cat {
+  font-size: 14px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+.score-ptp {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── PERC ── */
+.perc-banner {
+  padding: 16px 18px;
+  border-radius: 8px;
+  border: 1px solid;
+  margin-bottom: 16px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.perc-banner.pass { border-color: var(--green); background: rgba(76,175,130,0.07); color: var(--green); }
+.perc-banner.fail { border-color: var(--red); background: rgba(224,90,90,0.07); color: var(--red); }
+.perc-banner.na   { border-color: var(--faint); background: var(--s2); color: var(--muted); }
+
+.perc-banner strong { color: inherit; }
+
+/* ── D-DIMER SECTION ── */
+.dd-input-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.dd-wrap { position: relative; flex: 1; }
+
+input[type="number"] {
+  width: 100%;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 58px 14px 16px;
+  font-family: 'DM Mono', monospace;
+  font-size: 22px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button { display: none; }
+input[type="number"]:focus { border-color: var(--blue); }
+
+.dd-unit-badge {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.unit-btns { display: flex; flex-direction: column; gap: 4px; }
+.unit-btn {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.unit-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,148,58,0.08); }
+
+/* ── RESULT TILES ── */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.tile {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.tile.hl { border-color: var(--gold); background: rgba(201,148,58,0.05); }
+.tile-lbl { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.tile-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  font-style: italic;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.tile-sub { font-size: 10px; color: var(--muted); }
+
+/* ── PROBABILITY STRIP ── */
+.prob-strip { margin-bottom: 16px; }
+.p-row { display: flex; align-items: center; gap: 12px; margin-bottom: 7px; }
+.p-lbl { font-size: 10px; color: var(--muted); width: 78px; text-align: right; flex-shrink: 0; }
+.p-bar { flex: 1; position: relative; height: 18px; background: linear-gradient(to right, var(--green), var(--yellow), var(--red)); border-radius: 4px; }
+.p-marker {
+  position: absolute; top: -4px; width: 3px; height: 26px;
+  background: #fff; border-radius: 2px; transform: translateX(-50%);
+  box-shadow: 0 0 6px rgba(255,255,255,0.5);
+  transition: left 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.p-pct { font-size: 11px; width: 44px; text-align: right; flex-shrink: 0; }
+
+/* ── iLR TABLE ── */
+.ilr-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.ilr-table th {
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); text-align: left;
+  padding: 5px 10px 9px; border-bottom: 1px solid var(--border);
+}
+.ilr-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+.ilr-table tr.hit td { background: rgba(201,148,58,0.07); color: var(--gold); }
+
+.chip {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 500;
+}
+.chip-g { background: rgba(76,175,130,0.14); color: var(--green); }
+.chip-y { background: rgba(212,169,74,0.15); color: var(--yellow); }
+.chip-r { background: rgba(224,90,90,0.14); color: var(--red); }
+
+/* ── FAGAN ── */
+.fagan-outer { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.fagan-side { flex: 1; min-width: 180px; }
+.fagan-row { margin-bottom: 10px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+.fagan-row strong { color: var(--text); }
+
+/* ── INTERP BOX ── */
+.interp {
+  font-size: 11px; line-height: 1.8;
+  padding: 14px 16px;
+  background: var(--s2);
+  border-radius: 8px;
+  border-left: 3px solid var(--gold);
+  margin-top: 14px;
+  color: var(--text);
+}
+
+/* ── BUTTON ── */
+.btn-next {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 6px;
+  background: var(--gold);
+  color: #000;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+}
+.btn-next:hover { background: var(--gold2); }
+.btn-next.secondary {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted);
+}
+.btn-next.secondary:hover { border-color: var(--gold); color: var(--gold); background: rgba(201,148,58,0.05); }
+
+.btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+
+/* ── REFS ── */
+.refs { font-size: 10px; color: var(--muted); line-height: 1.85; }
+.refs strong { color: var(--text); }
+
+/* ── DISCLAIMER ── */
+.disclaimer {
+  margin-top: 24px; padding: 14px 16px;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  font-size: 10px; color: var(--muted); line-height: 1.75;
+}
+.disclaimer strong { color: var(--red); }
+
+.fade-in { animation: fadeUp 0.3s ease forwards; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;} }
+
+.tag {
+  display: inline-block; padding: 1px 7px; border-radius: 3px;
+  font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  background: rgba(77,157,224,0.12); color: var(--blue);
+  vertical-align: middle; margin-left: 4px;
+}
+
+@media(max-width:560px){
+  .tiles{grid-template-columns:1fr 1fr;}
+  .panels-wrap{padding:16px 16px;}
+  .masthead{padding:24px 16px 20px;}
+  .step-nav{padding:0 10px;}
+  .step-name{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="masthead-eyebrow">Emergency Medicine · Clinical Decision Support</div>
+  <h1>PE Workup<br><em>Wells · PERC · D-Dimer iLR</em></h1>
+  <p class="masthead-sub">
+    A stepwise PE evaluation tool. Calculate Wells PE score, apply PERC rule if appropriate,
+    then compute the Kohn 2017 interval likelihood ratio from a quantitative D-dimer to derive
+    a Bayesian post-test probability.
+  </p>
+</div>
+
+<!-- STEP NAV -->
+<div class="step-nav">
+  <div class="step-tab active" id="tab-1" onclick="goTab(1)">
+    <div class="step-num">1</div>
+    <span class="step-name">Wells Score</span>
+    <span class="step-score" id="tab1-score">&nbsp;</span>
+  </div>
+  <div class="step-tab" id="tab-2" onclick="goTab(2)">
+    <div class="step-num">2</div>
+    <span class="step-name">PERC Rule</span>
+    <span class="step-score" id="tab2-score">&nbsp;</span>
+  </div>
+  <div class="step-tab" id="tab-3" onclick="goTab(3)">
+    <div class="step-num">3</div>
+    <span class="step-name">D-Dimer iLR</span>
+    <span class="step-score" id="tab3-score">&nbsp;</span>
+  </div>
+</div>
+
+<!-- PANELS -->
+<div class="panels-wrap">
+
+  <!-- ═══════════════════════════════════════════════ PANEL 1: WELLS -->
+  <div class="panel active" id="panel-1">
+    <div class="card">
+      <div class="card-hd">Wells PE Criteria <span class="tag">Wells 2001</span></div>
+      <div class="checklist" id="wells-list"></div>
+    </div>
+
+    <div class="score-result" id="wells-result">
+      <div class="score-big" id="wells-big" style="color:var(--green)">0</div>
+      <div class="score-meta">
+        <div class="score-cat" id="wells-cat">Low probability</div>
+        <div class="score-ptp" id="wells-ptp">Estimated PE prevalence: ~2% (Wells &lt;2)<br>Pre-test probability for D-dimer calculation: <strong id="wells-ptp-num">~2%</strong></div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--s2);border-color:var(--faint);">
+      <div style="font-size:10px;color:var(--muted);line-height:1.75;">
+        <strong style="color:var(--text);">Interpretation</strong><br>
+        Score &lt; 2: Low (PE prevalence ~2%) · Score 2–6: Moderate (~17%) · Score &gt; 6: High (~40%)<br>
+        Dichotomized: ≤ 4 = PE Unlikely (~12%) · &gt; 4 = PE Likely (~37%)<br>
+        <em>Note: "PE diagnosis more likely than alternative" criterion requires clinical judgment.</em>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-next" onclick="goTab(2)">Next → PERC Rule ›</button>
+      <button class="btn-next secondary" onclick="goTab(3)">Skip to D-Dimer ›</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ PANEL 2: PERC -->
+  <div class="panel" id="panel-2">
+    <div class="card">
+      <div class="card-hd">PERC Rule <span class="tag">Kline 2004</span></div>
+
+      <div id="perc-guidance" class="perc-banner na" style="margin-bottom:14px;"></div>
+
+      <div class="checklist" id="perc-list"></div>
+    </div>
+
+    <div id="perc-result-card" class="card" style="display:none;">
+      <div class="card-hd">PERC Result</div>
+      <div class="perc-banner" id="perc-verdict"></div>
+      <div style="font-size:10px;color:var(--muted);line-height:1.75;margin-top:8px;" id="perc-footnote"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-next" onclick="goTab(3)">Next → D-Dimer iLR ›</button>
+      <button class="btn-next secondary" onclick="goTab(1)">‹ Back to Wells</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ PANEL 3: D-DIMER -->
+  <div class="panel" id="panel-3">
+
+    <div class="card">
+      <div class="card-hd">Pre-test Probability</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;" id="dd-ptp-note">
+        Auto-populated from Wells score. Adjust if needed.
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+        <span style="font-size:11px;color:var(--text);width:38px;text-align:right;flex-shrink:0;" id="ptp-label">15%</span>
+        <input type="range" id="ptp-slider" min="1" max="85" value="15"
+          style="flex:1;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;cursor:pointer;"
+          oninput="onPTPSlide()">
+        <span style="font-size:10px;color:var(--muted);min-width:120px;" id="ptp-cat">Low (Wells ≤4)</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--faint);margin-top:4px;">
+        <span>1%</span><span>Low</span><span>Moderate</span><span>High</span><span>85%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">D-Dimer Result <span class="tag">Kohn AEM 2017</span></div>
+      <div class="dd-input-row">
+        <div class="dd-wrap">
+          <input type="number" id="dd-val" placeholder="e.g. 620" min="0" step="any" oninput="calcDD()">
+          <span class="dd-unit-badge" id="dd-unit-badge">ng/mL</span>
+        </div>
+        <div class="unit-btns">
+          <button class="unit-btn active" id="btn-ngml" onclick="setUnit('ngmL')">ng/mL<br><span style="color:var(--faint);font-size:9px;">= µg/L</span></button>
+          <button class="unit-btn" id="btn-mgl" onclick="setUnit('mgL')">mg/L<br><span style="color:var(--faint);font-size:9px;">= µg/mL</span></button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;">
+        Standard cutoff: <strong style="color:var(--text)">500 ng/mL</strong> ·
+        Age-adjusted (>50): age × 10 ng/mL ·
+        PEGeD low-PTP cutoff: <strong style="color:var(--text)">1,000 ng/mL</strong>
+      </div>
+    </div>
+
+    <!-- DD Results (hidden until input) -->
+    <div id="dd-results" style="display:none;">
+
+      <div class="card fade-in">
+        <div class="card-hd">Bayesian Result</div>
+        <div class="tiles" id="dd-tiles"></div>
+
+        <div class="prob-strip">
+          <div class="p-row">
+            <span class="p-lbl">Pre-test</span>
+            <div class="p-bar"><div class="p-marker" id="pre-mk"></div></div>
+            <span class="p-pct" id="pre-pct-lbl">—</span>
+          </div>
+          <div class="p-row">
+            <span class="p-lbl" style="color:var(--gold);">Post-test</span>
+            <div class="p-bar"><div class="p-marker" id="post-mk" style="background:var(--gold);box-shadow:0 0 8px rgba(201,148,58,0.7);"></div></div>
+            <span class="p-pct" id="post-pct-lbl" style="color:var(--gold);">—</span>
+          </div>
+        </div>
+
+        <div class="interp" id="dd-interp"></div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="card-hd">Kohn 2017 — Full iLR Reference Table</div>
+        <table class="ilr-table">
+          <thead>
+            <tr>
+              <th>Interval (ng/mL)</th>
+              <th>Observed iLR</th>
+              <th>95% CI</th>
+              <th>Fitted iLR</th>
+              <th>Post-test @ PTP</th>
+            </tr>
+          </thead>
+          <tbody id="ilr-tbody"></tbody>
+        </table>
+        <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7;">
+          Anchor: 1,000–1,499 ng/mL iLR = 0.98 ≈ 1.0. Between-interval factor = 2.0 (95% CI 1.9–2.1).
+          n = 6,013 from 5 pooled PE management studies. Bayesian calc uses <em>observed</em> iLR.
+        </div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="card-hd">Fagan Nomogram</div>
+        <div class="fagan-outer">
+          <svg id="fagan-svg" width="160" height="280" viewBox="0 0 160 280" style="flex-shrink:0;"></svg>
+          <div class="fagan-side">
+            <div class="fagan-row"><strong>Pre-test:</strong> <span id="f-pre">—</span></div>
+            <div class="fagan-row"><strong>iLR (Kohn 2017 observed):</strong> <span id="f-lr">—</span></div>
+            <div class="fagan-row"><strong>Post-test:</strong> <span id="f-post">—</span></div>
+            <div class="fagan-row" style="font-size:10px;color:var(--faint);margin-top:10px;">
+              Log-odds scale. Line pivots through iLR from pre-test (left) to post-test (right).
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /dd-results -->
+
+    <div class="btn-row">
+      <button class="btn-next secondary" onclick="goTab(2)">‹ Back to PERC</button>
+    </div>
+  </div><!-- /panel-3 -->
+
+  <!-- REFS -->
+  <div class="card" style="margin-top:8px;">
+    <div class="card-hd">Evidence Base</div>
+    <div class="refs">
+      <strong>Wells PS et al.</strong> "Excluding pulmonary embolism at the bedside without diagnostic imaging." <em>Ann Intern Med.</em> 2001;135:98–107 — derivation of the Wells PE clinical prediction rule.<br>
+      <strong>Kline JA et al.</strong> "Clinical criteria to prevent unnecessary diagnostic testing in emergency department patients with suspected pulmonary embolism." <em>J Thromb Haemost.</em> 2004;2:1247–1255 — PERC rule derivation.<br>
+      <strong>Kohn MA, Klok FA, van Es N.</strong> "D-dimer Interval Likelihood Ratios for Pulmonary Embolism." <em>Acad Emerg Med.</em> 2017;24:832–837 — pooled iLR model (n=6,013).<br>
+      <strong>Kearon C et al.</strong> PEGeD study. <em>NEJM.</em> 2019;381:2125–2134 — PTP-stratified D-dimer cutoffs validated prospectively.
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>⚠ Decision support only.</strong> This tool does not replace clinical judgment or institutional protocols.
+    Wells score interpretation requires physician assessment; "PE diagnosis more likely than alternative" is a subjective criterion.
+    PERC rule is validated only in low pre-test probability patients. D-dimer iLRs (Kohn 2017) were derived from high-sensitivity
+    quantitative ELISA-based assays and may vary by platform. Always confirm with attending physician and local guidelines.
+  </div>
+
+</div><!-- /panels-wrap -->
+
+<script>
+// ════════════════════════════════════════════════════════
+// WELLS PE CRITERIA  (Wells 2001, Ann Intern Med)
+// ════════════════════════════════════════════════════════
+const WELLS = [
+  { id:'w1', label:'Clinical signs/symptoms of DVT (leg swelling, pain with palpation of deep veins)', pts:3.0 },
+  { id:'w2', label:'PE is #1 diagnosis, or equally likely as alternative diagnosis', pts:3.0 },
+  { id:'w3', label:'Heart rate > 100 bpm', pts:1.5 },
+  { id:'w4', label:'Immobilization ≥ 3 days OR surgery within 4 weeks', pts:1.5 },
+  { id:'w5', label:'Previous DVT or PE (objectively diagnosed)', pts:1.5 },
+  { id:'w6', label:'Hemoptysis', pts:1.0 },
+  { id:'w7', label:'Malignancy (on treatment, treated in last 6 months, or palliative)', pts:1.0 },
+];
+
+// PERC RULE (Kline 2004 — all 8 must be absent to "pass")
+const PERC = [
+  { id:'p1', label:'Age ≥ 50 years' },
+  { id:'p2', label:'Heart rate ≥ 100 bpm' },
+  { id:'p3', label:'O₂ saturation < 95% on room air' },
+  { id:'p4', label:'Unilateral leg swelling' },
+  { id:'p5', label:'Hemoptysis' },
+  { id:'p6', label:'Recent surgery or trauma (requiring general anesthesia within 4 weeks)' },
+  { id:'p7', label:'Prior DVT or PE' },
+  { id:'p8', label:'Exogenous estrogen use (OCP, HRT, etc.)' },
+];
+
+// KOHN 2017 iLR TABLE
+const BANDS = [
+  { lo:0,    hi:250,  label:'< 250',         obs:0.11, cilo:0.08, cihi:0.14,  fit:0.12 },
+  { lo:250,  hi:500,  label:'250 – 499',      obs:0.27, cilo:0.23, cihi:0.31,  fit:0.25 },
+  { lo:500,  hi:750,  label:'500 – 749',      obs:0.52, cilo:0.43, cihi:0.63,  fit:0.49 },
+  { lo:750,  hi:1000, label:'750 – 999',      obs:0.72, cilo:0.57, cihi:0.90,  fit:0.98 },
+  { lo:1000, hi:1500, label:'1,000 – 1,499 ★',obs:0.98, cilo:0.82, cihi:1.18, fit:1.0  },
+  { lo:1500, hi:2500, label:'1,500 – 2,499',  obs:1.66, cilo:1.40, cihi:1.97,  fit:2.0  },
+  { lo:2500, hi:5000, label:'2,500 – 4,999',  obs:3.26, cilo:2.71, cihi:3.92,  fit:4.0  },
+  { lo:5000, hi:Infinity, label:'≥ 5,000',    obs:7.99, cilo:6.31, cihi:10.12, fit:8.0  },
+];
+
+// ── State ──────────────────────────────────────────────
+const wellsState = {};
+const percState  = {};
+let ddUnit = 'ngmL';
+let ptpPct = 15;
+let wellsFromScore = 15; // PTP derived from Wells
+
+// ── Build Wells checklist ──────────────────────────────
+(function buildWells() {
+  const el = document.getElementById('wells-list');
+  WELLS.forEach(item => {
+    wellsState[item.id] = false;
+    const div = document.createElement('div');
+    div.className = 'check-item';
+    div.id = 'wi-' + item.id;
+    div.innerHTML = `
+      <div class="check-box" id="wb-${item.id}"></div>
+      <span class="check-label">${item.label}</span>
+      <span class="check-pts">+${item.pts}</span>`;
+    div.onclick = () => toggleWells(item.id);
+    el.appendChild(div);
+  });
+})();
+
+function toggleWells(id) {
+  wellsState[id] = !wellsState[id];
+  document.getElementById('wi-'+id).classList.toggle('checked', wellsState[id]);
+  document.getElementById('wb-'+id).textContent = wellsState[id] ? '✓' : '';
+  updateWells();
+}
+
+function updateWells() {
+  const score = WELLS.reduce((s,i) => s + (wellsState[i.id] ? i.pts : 0), 0);
+  // Category + PTP
+  let cat, ptp, ptpNote;
+  if (score < 2) {
+    cat = 'Low probability'; ptp = 2;
+    ptpNote = 'Score < 2 → Low risk · PE prevalence ~2%';
+  } else if (score <= 6) {
+    cat = 'Moderate probability'; ptp = 17;
+    ptpNote = 'Score 2–6 → Moderate risk · PE prevalence ~17%';
+  } else {
+    cat = 'High probability'; ptp = 40;
+    ptpNote = 'Score > 6 → High risk · PE prevalence ~40%';
+  }
+
+  const col = ptp <= 5 ? 'var(--green)' : ptp <= 20 ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('wells-big').textContent = score % 1 === 0 ? score : score.toFixed(1);
+  document.getElementById('wells-big').style.color = col;
+  document.getElementById('wells-cat').textContent = cat;
+  document.getElementById('wells-ptp').innerHTML =
+    `${ptpNote}<br>Pre-test probability for D-dimer calculation: <strong id="wells-ptp-num">~${ptp}%</strong>`;
+
+  // Tab badge
+  document.getElementById('tab1-score').textContent = 'Score: ' + (score % 1 === 0 ? score : score.toFixed(1));
+  document.getElementById('tab-1').classList.add('done');
+
+  // Feed PTP into D-dimer panel
+  wellsFromScore = ptp;
+  setSlider(ptp);
+  updatePercGuidance(score, ptp);
+}
+
+// ── Build PERC checklist ───────────────────────────────
+(function buildPerc() {
+  const el = document.getElementById('perc-list');
+  PERC.forEach(item => {
+    percState[item.id] = false;
+    const div = document.createElement('div');
+    div.className = 'check-item';
+    div.id = 'pi-' + item.id;
+    div.innerHTML = `
+      <div class="check-box" id="pb-${item.id}"></div>
+      <span class="check-label">${item.label}</span>
+      <span class="check-pts" style="color:var(--red);font-size:10px;">present</span>`;
+    div.onclick = () => togglePerc(item.id);
+    el.appendChild(div);
+  });
+})();
+
+function togglePerc(id) {
+  percState[id] = !percState[id];
+  document.getElementById('pi-'+id).classList.toggle('checked', percState[id]);
+  document.getElementById('pb-'+id).textContent = percState[id] ? '✓' : '';
+  updatePerc();
+}
+
+function updatePercGuidance(wellsScore, ptp) {
+  const el = document.getElementById('perc-guidance');
+  if (ptp > 15) {
+    el.className = 'perc-banner fail';
+    el.innerHTML = '<strong>PERC not applicable.</strong> Pre-test probability is moderate-to-high (Wells score ' + wellsScore.toFixed(1) + ', PTP ~' + ptp + '%). PERC rule is only validated for low pre-test probability patients. Proceed directly to D-dimer or imaging per clinical pathway.';
+  } else if (ptp <= 15) {
+    el.className = 'perc-banner pass';
+    el.innerHTML = '<strong>PERC may be applied.</strong> Pre-test probability is low (Wells score ' + wellsScore.toFixed(1) + ', PTP ~' + ptp + '%). If ALL 8 PERC criteria are absent, PE can be ruled out without D-dimer testing (Kline 2004; post-test probability &lt;2%).';
+  } else {
+    el.className = 'perc-banner na';
+    el.innerHTML = 'Complete Wells score to determine PERC applicability.';
+  }
+}
+
+function updatePerc() {
+  const anyPresent = PERC.some(i => percState[i.id]);
+  const count = PERC.filter(i => percState[i.id]).length;
+  const card = document.getElementById('perc-result-card');
+  const verdict = document.getElementById('perc-verdict');
+  const note = document.getElementById('perc-footnote');
+  card.style.display = 'block';
+
+  const ptp = wellsFromScore;
+
+  if (ptp > 15) {
+    verdict.className = 'perc-banner fail';
+    verdict.innerHTML = '<strong>PERC Not Applicable</strong> — pre-test probability too high. Proceed to D-dimer or imaging.';
+    note.innerHTML = '';
+    document.getElementById('tab2-score').textContent = 'N/A (mod-high PTP)';
+    document.getElementById('tab-2').classList.add('done');
+    return;
+  }
+
+  if (!anyPresent) {
+    verdict.className = 'perc-banner pass';
+    verdict.innerHTML = '<strong>✓ PERC Negative</strong> — all 8 criteria absent. PE can be ruled out without further testing. Post-test probability &lt;2%.';
+    note.innerHTML = 'Kline 2004: In patients with low pre-test probability AND all PERC criteria absent, the miss rate is &lt;2% — below the threshold for acceptable test failure rate. No D-dimer or imaging required.';
+    document.getElementById('tab2-score').textContent = '✓ PERC Negative';
+  } else {
+    verdict.className = 'perc-banner fail';
+    verdict.innerHTML = `<strong>✗ PERC Positive</strong> — ${count} criterion/criteria present. D-dimer testing is indicated.`;
+    note.innerHTML = 'One or more PERC criteria are present. PERC rule cannot be used to exclude PE. Proceed with D-dimer measurement and apply Kohn 2017 iLR with Wells-derived pre-test probability.';
+    document.getElementById('tab2-score').textContent = `${count} criteria present`;
+  }
+  document.getElementById('tab-2').classList.add('done');
+}
+
+// ── Tab navigation ─────────────────────────────────────
+function goTab(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('panel-'+i).classList.toggle('active', i===n);
+    document.getElementById('tab-'+i).classList.toggle('active', i===n);
+  });
+  if(n===3) calcDD();
+}
+
+// ── D-dimer ────────────────────────────────────────────
+function setUnit(u) {
+  ddUnit = u;
+  document.getElementById('btn-ngml').classList.toggle('active', u==='ngmL');
+  document.getElementById('btn-mgl').classList.toggle('active', u==='mgL');
+  document.getElementById('dd-unit-badge').textContent = u==='ngmL' ? 'ng/mL' : 'mg/L';
+  calcDD();
+}
+
+function setSlider(pct) {
+  ptpPct = pct;
+  document.getElementById('ptp-slider').value = pct;
+  document.getElementById('ptp-label').textContent = pct + '%';
+  document.getElementById('ptp-cat').textContent =
+    pct<=5  ? 'Very low PTP' :
+    pct<=15 ? 'Low (Wells < 2)' :
+    pct<=25 ? 'Moderate-Low (Wells 2–4)' :
+    pct<=40 ? 'Moderate (Wells 4–6)' : 'High (Wells > 6)';
+  calcDD();
+}
+
+function onPTPSlide() {
+  ptpPct = +document.getElementById('ptp-slider').value;
+  document.getElementById('ptp-label').textContent = ptpPct + '%';
+  document.getElementById('ptp-cat').textContent =
+    ptpPct<=5  ? 'Very low PTP' :
+    ptpPct<=15 ? 'Low (Wells < 2)' :
+    ptpPct<=25 ? 'Moderate-Low (Wells 2–4)' :
+    ptpPct<=40 ? 'Moderate (Wells 4–6)' : 'High (Wells > 6)';
+  calcDD();
+}
+
+const toOdds = p => p/(1-p);
+const toProb = o => o/(1+o);
+const bayes  = (p,lr) => toProb(toOdds(p)*lr);
+
+function chipCls(lr){ return lr<0.5?'chip-g':lr<1.5?'chip-y':'chip-r'; }
+
+function calcDD() {
+  const raw = parseFloat(document.getElementById('dd-val').value);
+  if (isNaN(raw)||raw<0) {
+    document.getElementById('dd-results').style.display='none';
+    document.getElementById('tab3-score').textContent='';
+    return;
+  }
+  const val = ddUnit==='mgL' ? raw*1000 : raw;
+  const band = BANDS.find(b=>val>=b.lo&&val<b.hi)||BANDS[BANDS.length-1];
+  const lr = band.obs;
+  const prior = ptpPct/100;
+  const post  = bayes(prior, lr);
+  const postPct = (post*100).toFixed(1);
+  const dispVal = ddUnit==='mgL' ? raw.toFixed(2) : Math.round(raw);
+  const unitStr = ddUnit==='mgL' ? 'mg/L' : 'ng/mL';
+
+  document.getElementById('dd-results').style.display='block';
+  document.getElementById('tab3-score').textContent='Post: '+postPct+'%';
+  document.getElementById('tab-3').classList.add('done');
+
+  const lrCol   = lr<0.5?'var(--green)':lr<1.5?'var(--yellow)':'var(--red)';
+  const postCol = post>0.40?'var(--red)':post>0.15?'var(--yellow)':'var(--green)';
+
+  // Tiles
+  document.getElementById('dd-tiles').innerHTML=`
+    <div class="tile hl">
+      <div class="tile-lbl">Interval LR</div>
+      <div class="tile-val" style="color:${lrCol}">${lr.toFixed(2)}</div>
+      <div class="tile-sub">CI: ${band.cilo}–${band.cihi}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-lbl">Pre-test</div>
+      <div class="tile-val">${ptpPct}%</div>
+      <div class="tile-sub">Wells-derived</div>
+    </div>
+    <div class="tile">
+      <div class="tile-lbl">Post-test</div>
+      <div class="tile-val" style="color:${postCol}">${postPct}%</div>
+      <div class="tile-sub">posterior prob.</div>
+    </div>`;
+
+  // Strip
+  document.getElementById('pre-mk').style.left  = Math.min(prior*100,97)+'%';
+  document.getElementById('pre-pct-lbl').textContent = ptpPct+'%';
+  document.getElementById('post-mk').style.left = Math.min(post*100,97)+'%';
+  document.getElementById('post-pct-lbl').textContent = postPct+'%';
+
+  // Interpretation
+  const interpMap = [
+    [0.15, `D-dimer <strong>${dispVal} ${unitStr}</strong> · interval <strong>${band.label} ng/mL</strong> · iLR = ${lr}. 
+    Strongly negative. PE probability reduced from ${ptpPct}% → <strong style="color:var(--green)">${postPct}%</strong>. 
+    ${post<0.03?'Post-test probability is below 3% — PE rule-out without imaging is supported per Kohn 2017 and standard algorithms.':'Despite strongly negative iLR, pre-test probability is elevated. Full algorithm review required.'}`],
+    [0.5,  `D-dimer <strong>${dispVal} ${unitStr}</strong> · interval <strong>${band.label} ng/mL</strong> · iLR = ${lr}. 
+    Moderately negative. PE probability reduced from ${ptpPct}% → <strong>${postPct}%</strong>. 
+    ${post<0.03?'Post-test &lt;3% — rule-out supported.':post<0.05?'Post-test 3–5%: borderline; clinical algorithm (YEARS, PEGeD) should guide imaging.':'Post-test &gt;5% — imaging likely warranted.'}`],
+    [1.5,  `D-dimer <strong>${dispVal} ${unitStr}</strong> falls in the <strong>anchor zone</strong> (${band.label} ng/mL), where Kohn 2017 iLR ≈ 1.0. 
+    This result provides <strong>essentially no diagnostic information</strong>. Post-test probability (${postPct}%) ≈ pre-test probability (${ptpPct}%). 
+    The imaging decision must be driven entirely by clinical pre-test probability and the Wells score.`],
+    [4.0,  `D-dimer <strong>${dispVal} ${unitStr}</strong> · interval <strong>${band.label} ng/mL</strong> · iLR = ${lr}. 
+    Moderately positive. PE probability raised from ${ptpPct}% → <strong style="color:var(--yellow)">${postPct}%</strong>. 
+    CTPA or V/Q imaging is generally indicated.`],
+    [Infinity, `D-dimer <strong>${dispVal} ${unitStr}</strong> · interval <strong>${band.label} ng/mL</strong> · iLR = ${lr}. 
+    <strong>Strongly positive</strong> — highest-tier iLR in Kohn 2017. PE probability elevated to <strong style="color:var(--red)">${postPct}%</strong>. 
+    Diagnostic imaging is urgently indicated.`],
+  ];
+  document.getElementById('dd-interp').innerHTML = interpMap.find(([t])=>lr<=t)[1];
+
+  // Table
+  const tbody = document.getElementById('ilr-tbody');
+  tbody.innerHTML='';
+  BANDS.forEach(b => {
+    const isHit = val>=b.lo&&val<b.hi;
+    const rPost = bayes(prior, b.obs);
+    const rCol  = rPost>0.40?'var(--red)':rPost>0.15?'var(--yellow)':'var(--green)';
+    const tr = document.createElement('tr');
+    if(isHit) tr.className='hit';
+    tr.innerHTML=`
+      <td>${b.label}${isHit?' <span style="color:var(--gold);font-size:10px;">← your value</span>':''}</td>
+      <td><span class="chip ${chipCls(b.obs)}">${b.obs.toFixed(2)}</span></td>
+      <td style="color:var(--muted);font-size:10px;">${b.cilo}–${b.cihi}</td>
+      <td style="color:var(--faint);font-size:10px;">${b.fit.toFixed(2)}</td>
+      <td style="color:${isHit?postCol:'var(--muted)'};">${(rPost*100).toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Fagan
+  drawFagan(prior, post);
+  document.getElementById('f-pre').textContent  = ptpPct+'%';
+  document.getElementById('f-lr').textContent   = lr.toFixed(2);
+  document.getElementById('f-post').textContent = postPct+'%';
+}
+
+// ── Fagan SVG ──────────────────────────────────────────
+function drawFagan(prior, post) {
+  const svg = document.getElementById('fagan-svg');
+  svg.innerHTML='';
+  const W=160,H=280,pad=32,axH=H-pad*2,xL=22,xR=W-22;
+
+  function pY(p){
+    p=Math.max(0.005,Math.min(0.995,p));
+    return pad+axH*(1-(Math.log(p/(1-p))+5)/10);
+  }
+  function el(tag,a){
+    const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v));
+    return e;
+  }
+  function txt(x,y,s,anchor,col){
+    const t=el('text',{x,y,'text-anchor':anchor||'middle',fill:col||'#2e3d55','font-size':8,'font-family':'DM Mono,monospace'});
+    t.textContent=s; svg.appendChild(t);
+  }
+
+  svg.appendChild(el('line',{x1:xL,y1:pad,x2:xL,y2:H-pad,stroke:'#2e3d55','stroke-width':1}));
+  svg.appendChild(el('line',{x1:xR,y1:pad,x2:xR,y2:H-pad,stroke:'#2e3d55','stroke-width':1}));
+  txt(xL, pad-7, 'Pre (%)', 'middle', '#6e8099');
+  txt(xR, pad-7, 'Post (%)', 'middle', '#6e8099');
+
+  [0.01,0.02,0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95].forEach(p=>{
+    const y=pY(p), pct=Math.round(p*100);
+    svg.appendChild(el('line',{x1:xL-3,y1:y,x2:xL,y2:y,stroke:'#2e3d55','stroke-width':1}));
+    txt(xL-5,y+3,pct,'end','#2e3d55');
+    svg.appendChild(el('line',{x1:xR,y1:y,x2:xR+3,y2:y,stroke:'#2e3d55','stroke-width':1}));
+    txt(xR+5,y+3,pct,'start','#2e3d55');
+  });
+
+  const yPre=pY(prior), yPost=pY(post);
+  const lc = post>0.40?'#e05a5a':post>0.15?'#d4a94a':'#4caf82';
+
+  svg.appendChild(el('line',{x1:xL,y1:yPre,x2:xR,y2:yPost,stroke:lc,'stroke-width':1.5}));
+  svg.appendChild(el('circle',{cx:xL,cy:yPre,r:4,fill:'#4d9de0'}));
+  svg.appendChild(el('circle',{cx:xR,cy:yPost,r:4,fill:lc}));
+}
+
+// ── Init ───────────────────────────────────────────────
+updatePercGuidance(0, 2);
+setSlider(15);
+
+// Slider thumb style
+const sl = document.getElementById('ptp-slider');
+sl.style.setProperty('accent-color','#c9943a');
+</script>
+</body>
+</html>
