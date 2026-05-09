@@ -849,8 +849,17 @@ const live = {
   totalSeen: 0,
   lwbsCount: 0,
   sumBoardHr: 0,
-  boarderCount: 0
+  boarderCount: 0,
+  hudCache: {},        // last-written HUD values for change detection
+  lastBedTimeUpdate: 0 // sim hr of last bed-time text update
 };
+
+function setIfChanged(id, val) {
+  if (live.hudCache[id] !== val) {
+    document.getElementById(id).textContent = val;
+    live.hudCache[id] = val;
+  }
+}
 
 function bedSVG() {
   // simple top-down hospital bed icon, uses currentColor
@@ -938,6 +947,8 @@ function initLive() {
   live.sumBoardHr = 0;
   live.boarderCount = 0;
   live.lastFrame = null;
+  live.hudCache = {};
+  live.lastBedTimeUpdate = -1;
   renderHUD();
   renderQueue();
 }
@@ -948,9 +959,9 @@ function placeInEDBed(bed, pt, t) {
   pt.bedTime = t;
   const workup = expRand(live.rng, live.cfg.losDischarged);
   pt.workupEndTime = t + workup;
-  bed.el.classList.add('occupied', 'workup', 'flash-arrive');
-  bed.el.classList.remove('boarder');
-  setTimeout(() => bed.el.classList.remove('flash-arrive'), 600);
+  if (!bed.el.classList.contains('occupied')) bed.el.classList.add('occupied');
+  if (!bed.el.classList.contains('workup'))   bed.el.classList.add('workup');
+  if (bed.el.classList.contains('boarder'))   bed.el.classList.remove('boarder');
 }
 function admitToIPBed(ipBed, pt, t) {
   ipBed.state = 'occupied';
@@ -1088,45 +1099,56 @@ function processEventsUpTo(targetT) {
 }
 
 function renderHUD() {
-  let occ = 0, workup = 0, board = 0;
+  let occ = 0, workup = 0, board = 0, ipOcc = 0;
   for (const bed of live.edBeds) {
     if (bed.state !== 'empty') {
       occ++;
       if (bed.state === 'workup') workup++;
       else if (bed.state === 'boarder') board++;
-      if (bed.pt) {
+    }
+  }
+  for (const b of live.ipBeds) if (b.state === 'occupied') ipOcc++;
+
+  // throttle bed-time text updates to ~5Hz of sim time (i.e., every 0.2 sim hr)
+  if (live.simTime - live.lastBedTimeUpdate > 0.2 || live.simTime === 0) {
+    live.lastBedTimeUpdate = live.simTime;
+    for (const bed of live.edBeds) {
+      if (bed.state !== 'empty' && bed.pt) {
         const elapsed = bed.state === 'boarder'
           ? live.simTime - (bed.pt.boarderStartTime || bed.pt.bedTime)
           : live.simTime - bed.pt.bedTime;
-        bed.timeEl.textContent = elapsed.toFixed(1) + 'h';
+        const txt = elapsed.toFixed(1) + 'h';
+        if (bed.timeEl.textContent !== txt) bed.timeEl.textContent = txt;
+      } else if (bed.timeEl.textContent !== '') {
+        bed.timeEl.textContent = '';
       }
     }
   }
-  let ipOcc = 0;
-  for (const b of live.ipBeds) if (b.state === 'occupied') ipOcc++;
 
   const dayNum = Math.floor(live.simTime / 24) + 1;
   const hod = live.simTime - Math.floor(live.simTime / 24) * 24;
   const hh = Math.floor(hod), mm = Math.floor((hod - hh) * 60);
-  document.getElementById('hud-time').textContent = live.simTime.toFixed(1) + ' hr';
-  document.getElementById('hud-day').textContent = dayNum + ' · ' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
-  document.getElementById('hud-occ').textContent = occ + ' / ' + live.cfg.beds;
-  document.getElementById('hud-workup').textContent = workup;
-  document.getElementById('hud-board').textContent = board;
-  document.getElementById('hud-queue').textContent = live.waitingRoom.length;
-  document.getElementById('hud-ip').textContent = ipOcc + ' / ' + live.cfg.ipBeds;
-  document.getElementById('hud-avg-board').textContent =
-    live.boarderCount > 0 ? (live.sumBoardHr / live.boarderCount).toFixed(1) + ' hr' : '— hr';
-  document.getElementById('hud-lwbs').textContent = live.lwbsCount;
+  setIfChanged('hud-time', live.simTime.toFixed(1) + ' hr');
+  setIfChanged('hud-day',  dayNum + ' · ' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0'));
+  setIfChanged('hud-occ',  occ + ' / ' + live.cfg.beds);
+  setIfChanged('hud-workup', String(workup));
+  setIfChanged('hud-board',  String(board));
+  setIfChanged('hud-queue',  String(live.waitingRoom.length));
+  setIfChanged('hud-ip',     ipOcc + ' / ' + live.cfg.ipBeds);
+  setIfChanged('hud-avg-board',
+    live.boarderCount > 0 ? (live.sumBoardHr / live.boarderCount).toFixed(1) + ' hr' : '— hr');
+  setIfChanged('hud-lwbs', String(live.lwbsCount));
 }
 
 function renderQueue() {
   const el = document.getElementById('queue-icons');
-  if (live.waitingRoom.length === 0) {
+  const N = live.waitingRoom.length;
+  if (N === live.hudCache._queueN) return; // no change
+  live.hudCache._queueN = N;
+  if (N === 0) {
     el.innerHTML = '<span class="queue-empty">no patients waiting</span>';
     return;
   }
-  const N = live.waitingRoom.length;
   const show = Math.min(N, 30);
   let html = '';
   for (let i = 0; i < show; i++) html += '<div class="q-pt"></div>';
@@ -1592,13 +1614,17 @@ window.addEventListener('resize', () => {
   }
 });
 
-// Re-init the live grid when params change
+// Re-init the live grid when params change (debounced)
+let cfgChangeTimer = null;
 ['cfg-beds','cfg-ip-beds','cfg-admit','cfg-los-d','cfg-ip-los','cfg-dc-hour','cfg-dc-sigma',
  'cfg-tat','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
-    live.running = false;
-    document.getElementById('btn-play').textContent = '▶ Play';
-    initLive();
+    clearTimeout(cfgChangeTimer);
+    cfgChangeTimer = setTimeout(() => {
+      live.running = false;
+      document.getElementById('btn-play').textContent = '▶ Play';
+      initLive();
+    }, 150);
   });
 });
 
