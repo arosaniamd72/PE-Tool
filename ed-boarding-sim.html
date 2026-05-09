@@ -1520,8 +1520,15 @@ function renderStats(cfg, reps) {
 // ════════════════════════════════════════════════════════
 function setupCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || canvas.width;
-  const cssH = +canvas.getAttribute('height');
+  // Cache the original CSS-intended height on first setup. Subsequent calls
+  // mutate canvas.height (which reflects to the HTML attribute), so reading
+  // getAttribute('height') a second time would feed back the dpr-scaled value
+  // and the canvas would grow exponentially on each call.
+  if (!canvas.dataset.cssH) canvas.dataset.cssH = canvas.getAttribute('height');
+  const cssH = +canvas.dataset.cssH;
+  // Same hazard for width if we ever set width attribute via JS — guard the same way
+  if (!canvas.dataset.cssW) canvas.dataset.cssW = canvas.clientWidth || canvas.getAttribute('width');
+  const cssW = canvas.clientWidth || +canvas.dataset.cssW;
   canvas.width  = cssW * dpr;
   canvas.height = cssH * dpr;
   canvas.style.height = cssH + 'px';
