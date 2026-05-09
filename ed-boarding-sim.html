@@ -566,7 +566,7 @@ canvas { display: block; width: 100%; height: auto; }
       <strong style="color:var(--gold);">Boarder time is endogenous:</strong> a boarder leaves the ED only when an IP bed clears + completes turnaround. Tighter IP capacity → longer boarder times → backed-up ED → waiting room → LWBS.<br>
       <strong style="color:var(--gold);">Noon discharge clustering:</strong> IP beds become available in a daily wave around the configured DC hour. Watch the IP grid turn yellow (turnaround) mid-day, then re-fill from boarders. Boarders pile up overnight and clear after noon.<br>
       <strong style="color:var(--gold);">IP utilization:</strong> admit-rate × arrivals × IP-LOS / IP-beds. With defaults (0.84/hr × 5.5d / 120 = 0.92), IP runs hot — small perturbations cause cascading delays.<br>
-      <strong style="color:var(--gold);">Effective IP LOS:</strong> raw exponential mean is 5d, but rounding "ready" times forward to next noon adds ~12hr on average. Adjust IP-LOS-days down to ~4.5 if you want true 5d effective LOS.
+      <strong style="color:var(--gold);">Effective IP LOS:</strong> the entered "IP LOS (days)" is the <em>mean</em> of a log-normal distribution. Individual stays vary around it (default σ=0.6 → ~70% of patients between p15 and p85, with a long upper tail). Rounding each patient's "ready time" forward to the next noon DC adds ~12 hr on top, so effective mean ≈ entered value + 0.5 day. Adjust IP-LOS-days down to ~4.5 if you want true 5d effective LOS.
     </div>
   </div>
 
