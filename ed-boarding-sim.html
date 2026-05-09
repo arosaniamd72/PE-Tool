@@ -212,6 +212,13 @@ canvas { display: block; width: 100%; height: auto; }
   font-size: 10px; color: var(--muted);
   margin-left: auto;
 }
+.rep-picker { display: flex; align-items: center; gap: 6px; }
+.rep-label {
+  font-size: 10px; color: var(--muted);
+  min-width: 80px; text-align: center;
+  font-family: 'DM Mono', monospace;
+}
+.rep-label #rep-idx { color: var(--gold); font-weight: 500; }
 .speed-ctrl input[type="range"] {
   width: 160px; accent-color: var(--gold);
   background: var(--border); height: 4px; border-radius: 2px; outline: none;
@@ -475,6 +482,11 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="live-controls">
       <button class="btn small" id="btn-play" onclick="togglePlay()">▶ Play</button>
       <button class="btn small secondary" onclick="restartLive()">↻ Restart</button>
+      <div class="rep-picker">
+        <button class="btn small secondary" onclick="changeRep(-1)" title="Previous replicate">◀</button>
+        <span class="rep-label">Rep <span id="rep-idx">1</span> / <span id="rep-total">30</span></span>
+        <button class="btn small secondary" onclick="changeRep(1)" title="Next replicate">▶</button>
+      </div>
       <label class="speed-ctrl">
         <span><span id="speed-val">0.50</span> sim hr / sec</span>
         <input type="range" id="speed-slider" min="0.1" max="8" step="0.1" value="0.5" oninput="onSpeedChange()">
@@ -848,7 +860,9 @@ const live = {
   sumBoardHr: 0,
   boarderCount: 0,
   hudCache: {},        // last-written HUD values for change detection
-  lastBedTimeUpdate: 0 // sim hr of last bed-time text update
+  lastBedTimeUpdate: 0,// sim hr of last bed-time text update
+  replicateIdx: 0,     // which MC replicate the live run corresponds to (0-based)
+  tickHandle: null
 };
 
 const hudEls = {}; // cached element references
@@ -936,7 +950,13 @@ function buildBedGrid() {
 function initLive() {
   buildBedGrid();
   const cfg = live.cfg;
-  live.rng = rng((cfg.seed + 7777) >>> 0);
+  // clamp replicate index to current cfg.replicates
+  if (live.replicateIdx >= cfg.replicates) live.replicateIdx = cfg.replicates - 1;
+  if (live.replicateIdx < 0) live.replicateIdx = 0;
+  // SAME seed formula as Monte Carlo replicate live.replicateIdx
+  // → live animation IS replicate N of the ensemble below
+  live.rng = rng((cfg.seed + live.replicateIdx * 1000003) >>> 0);
+  updateRepLabel();
   // pre-generate arrivals
   live.arrivals = [];
   let t = 0;
@@ -1158,16 +1178,30 @@ function renderHUD() {
   const dayNum = Math.floor(live.simTime / 24) + 1;
   const hod = live.simTime - Math.floor(live.simTime / 24) * 24;
   const hh = Math.floor(hod), mm = Math.floor((hod - hh) * 60);
+
+  // if Monte Carlo has been run, append "(μ X.X)" comparisons
+  const ens = ensembleAt(live.simTime);
+  const fmtCmp = (cur, mean) =>
+    ens ? ` <span style="color:var(--muted);font-size:11px;">μ ${mean.toFixed(1)}</span>` : '';
+
   setIfChanged('hud-time', live.simTime.toFixed(1) + ' hr');
   setIfChanged('hud-day',  dayNum + ' · ' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0'));
-  setIfChanged('hud-occ',  occ + ' / ' + live.cfg.beds);
+  setIfChangedHTML('hud-occ',  occ + ' / ' + live.cfg.beds + (ens ? fmtCmp(occ, ens.ed) : ''));
   setIfChanged('hud-workup', String(workup));
-  setIfChanged('hud-board',  String(board));
-  setIfChanged('hud-queue',  String(live.waitingRoom.length));
-  setIfChanged('hud-ip',     ipOcc + ' / ' + live.cfg.ipBeds);
+  setIfChangedHTML('hud-board',  String(board) + (ens ? fmtCmp(board, ens.board) : ''));
+  setIfChangedHTML('hud-queue',  String(live.waitingRoom.length) + (ens ? fmtCmp(live.waitingRoom.length, ens.queue) : ''));
+  setIfChangedHTML('hud-ip',     ipOcc + ' / ' + live.cfg.ipBeds + (ens ? fmtCmp(ipOcc, ens.ip) : ''));
   setIfChanged('hud-avg-board',
     live.boarderCount > 0 ? (live.sumBoardHr / live.boarderCount).toFixed(1) + ' hr' : '— hr');
   setIfChanged('hud-lwbs', String(live.lwbsCount));
+}
+
+// like setIfChanged but uses innerHTML so we can format embedded mean spans
+function setIfChangedHTML(id, html) {
+  if (live.hudCache[id] !== html) {
+    (hudEls[id] || (hudEls[id] = document.getElementById(id))).innerHTML = html;
+    live.hudCache[id] = html;
+  }
 }
 
 function renderQueue() {
@@ -1272,6 +1306,27 @@ function onSpeedChange() {
   document.getElementById('speed-val').textContent = live.speed.toFixed(2);
 }
 
+function updateRepLabel() {
+  const total = live.cfg ? live.cfg.replicates : +document.getElementById('cfg-reps').value;
+  document.getElementById('rep-idx').textContent = (live.replicateIdx + 1);
+  document.getElementById('rep-total').textContent = total;
+}
+
+function changeRep(delta) {
+  const total = live.cfg ? live.cfg.replicates : +document.getElementById('cfg-reps').value;
+  live.replicateIdx = ((live.replicateIdx + delta) % total + total) % total;
+  // stop and re-init with new seed
+  live.running = false;
+  if (live.tickHandle) { clearTimeout(live.tickHandle); live.tickHandle = null; }
+  document.getElementById('btn-play').textContent = '▶ Play';
+  initLive();
+  // re-render charts so the new replicate is highlighted
+  if (lastResult) {
+    renderOccupancy(lastResult.cfg, lastResult.reps[live.replicateIdx] || lastResult.reps[0]);
+    renderBoardQueue(lastResult.cfg, lastResult.reps);
+  }
+}
+
 // ════════════════════════════════════════════════════════
 // Run multiple replicates
 // ════════════════════════════════════════════════════════
@@ -1317,9 +1372,13 @@ function runSim() {
       status.textContent = `running… ${i}/${cfg.replicates}`;
       setTimeout(batch, 0);
     } else {
-      lastResult = { cfg, reps };
+      const ensemble = computeEnsemble(reps);
+      lastResult = { cfg, reps, ensemble };
+      // clamp live.replicateIdx so picker stays in range, then re-bind label
+      if (live.replicateIdx >= cfg.replicates) live.replicateIdx = cfg.replicates - 1;
+      updateRepLabel();
       renderStats(cfg, reps);
-      renderOccupancy(cfg, reps[0]);
+      renderOccupancy(cfg, reps[live.replicateIdx] || reps[0]);
       renderBoardQueue(cfg, reps);
       renderHistogram(cfg, reps);
       status.textContent = `done — ${cfg.replicates} reps in ${(performance.now()-t0).toFixed(0)}ms`;
@@ -1345,6 +1404,52 @@ function resetDefaults() {
   document.getElementById('cfg-seed').value = 42;
   initLive();
   runSim();
+}
+
+// ════════════════════════════════════════════════════════
+// Ensemble (per-time-step mean across replicates)
+// ════════════════════════════════════════════════════════
+function computeEnsemble(reps) {
+  if (!reps || !reps.length) return null;
+  const N = reps[0].samples.length;
+  const E = {
+    times:    reps[0].samples.map(s => s.t),
+    boardMean:new Array(N).fill(0),
+    queueMean:new Array(N).fill(0),
+    ipMean:   new Array(N).fill(0),
+    edMean:   new Array(N).fill(0)
+  };
+  for (const rep of reps) {
+    for (let i = 0; i < N; i++) {
+      const s = rep.samples[i];
+      E.boardMean[i] += s.boarding;
+      E.queueMean[i] += s.queue;
+      E.ipMean[i]    += s.ipOcc;
+      E.edMean[i]    += s.edOccupied;
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    E.boardMean[i] /= reps.length;
+    E.queueMean[i] /= reps.length;
+    E.ipMean[i]    /= reps.length;
+    E.edMean[i]    /= reps.length;
+  }
+  return E;
+}
+
+// look up ensemble mean at a given simTime (linear search; fine — N=672 default)
+function ensembleAt(t) {
+  if (!lastResult || !lastResult.ensemble) return null;
+  const E = lastResult.ensemble;
+  if (E.times.length === 0) return null;
+  const dt = E.times[1] - E.times[0]; // 0.25 hr
+  const i = Math.min(E.times.length - 1, Math.max(0, Math.floor(t / dt)));
+  return {
+    board: E.boardMean[i],
+    queue: E.queueMean[i],
+    ip:    E.ipMean[i],
+    ed:    E.edMean[i]
+  };
 }
 
 // ════════════════════════════════════════════════════════
@@ -1611,6 +1716,32 @@ function renderBoardQueue(cfg, reps) {
   drawLine(boardMean, '#e05a5a', 1.6);
   drawLine(queueMean, '#d4a94a', 1.6);
 
+  // overlay the currently-selected replicate's trajectory in bold gold
+  const selRep = reps[live.replicateIdx] || reps[0];
+  if (selRep) {
+    ctx.strokeStyle = '#c9943a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const fn = i===0 ? 'moveTo' : 'lineTo';
+      ctx[fn](xs(i), ys(selRep.samples[i].boarding));
+    }
+    ctx.stroke();
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const fn = i===0 ? 'moveTo' : 'lineTo';
+      ctx[fn](xs(i), ys(selRep.samples[i].queue));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // chart annotation: which replicate is bold
+  ctx.fillStyle = '#c9943a';
+  ctx.font = '10px DM Mono, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`Rep ${live.replicateIdx+1} = bold gold (live)`, x1-6, y0+12);
+
   // warmup shading
   const warmupX = x0 + (x1-x0) * (cfg.warmup / cfg.simHours);
   ctx.fillStyle = 'rgba(110,128,153,0.08)';
@@ -1709,6 +1840,8 @@ let cfgChangeTimer = null;
 
 // Set initial speed display
 document.getElementById('speed-val').textContent = '0.50';
+// Init rep label
+updateRepLabel();
 </script>
 </body>
 </html>
