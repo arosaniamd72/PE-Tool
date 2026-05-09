@@ -431,9 +431,14 @@ canvas { display: block; width: 100%; height: auto; }
         <div class="hint">Gaussian noise</div>
       </div>
       <div class="ctrl">
+        <label>Transfer Delay (hr)</label>
+        <input type="number" id="cfg-xfer" value="1" min="0" step="0.1">
+        <div class="hint">Min ED dwell post-admit</div>
+      </div>
+      <div class="ctrl">
         <label>TAT (hr)</label>
         <input type="number" id="cfg-tat" value="2" min="0" step="0.1">
-        <div class="hint">Cleaning + transport</div>
+        <div class="hint">IP bed cleaning</div>
       </div>
       <div class="ctrl">
         <label>LWBS Threshold (hr)</label>
@@ -573,7 +578,8 @@ canvas { display: block; width: 100%; height: auto; }
   <div class="card">
     <div class="card-hd">Model Notes</div>
     <div class="refs">
-      <strong>Coupling:</strong> ED bed → ED workup → either discharge (88%) or boarder (12%) → IP bed → turnaround → IP bed reopens to next boarder. Boarders are FIFO; oldest boarder claims the next available IP bed.<br>
+      <strong>Coupling:</strong> ED bed → ED workup → either discharge (88%) or boarder (12%) → after Transfer Delay (handoff/transport, default 1 hr) → IP bed → IP LOS → discharge → turnaround → IP bed reopens to next ready boarder. Boarders are FIFO; oldest <em>transfer-ready</em> boarder claims the next available IP bed.<br>
+      <strong>Transfer Delay:</strong> minimum ED dwell time after admit decision, even when an IP bed is already empty. Captures handoff, transport, and bed-board lag. Each admit has avg boarder time ≥ Transfer Delay.<br>
       <strong>Arrival process:</strong> homogeneous Poisson (constant λ) — no time-of-day or day-of-week variation. Real EDs peak afternoons / evenings.<br>
       <strong>ED workup:</strong> exponential with the entered mean (default 4 hr). Applies to all comers; admit decision happens at end of workup.<br>
       <strong>IP LOS:</strong> log-normal with target mean = IP-LOS-days × 24 hr and log-space σ (default 0.6 → CV ≈ 0.66, realistic for hospital data; CV = 1 corresponds to exponential). Each patient's "ready time" is then pushed forward to the next configured DC hour ± Gaussian noise (DC σ).<br>
@@ -680,7 +686,8 @@ function simulate(cfg, r) {
   function oldestBoarder() {
     let oldest = null;
     for (const b of edBeds) {
-      if (b.state === 'boarder' && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
+      if (b.state === 'boarder' && b.pt.transferReady
+          && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
         oldest = b;
       }
     }
@@ -794,19 +801,23 @@ function simulate(cfg, r) {
         edDischarged++;
         fillEDFromWR(e.time);
       } else {
-        // admit pathway: try IP bed; else become boarder
-        const ip = ipBedAvail();
-        if (ip) {
-          // immediate transfer (boarder time = 0)
-          sumBoarderHr += 0; boarderCount++;
-          bed.state = 'empty'; bed.pt = null;
-          admitToIPBed(ip, pt, e.time);
-          fillEDFromWR(e.time);
-        } else {
-          bed.state = 'boarder';
-          pt.boarderStartTime = e.time;
-        }
+        // every admit boards for at least transferDelay hr — even if an IP
+        // bed is available right now, the patient still needs handoff +
+        // transport time before they actually leave the ED
+        bed.state = 'boarder';
+        pt.boarderStartTime = e.time;
+        pt.transferReady = false;
+        pt.earliestLeaveTime = e.time + cfg.transferDelay;
+        pushEvent({ time: pt.earliestLeaveTime, kind: 'transfer-ready', bed });
       }
+
+    } else if (e.kind === 'transfer-ready') {
+      const bed = e.bed;
+      if (bed.state !== 'boarder' || bed.pt.transferReady) continue; // stale
+      bed.pt.transferReady = true;
+      // patient is now eligible to leave; if IP bed is open, take it
+      const ip = ipBedAvail();
+      if (ip) dischargeBoarderToIP(bed, ip, e.time);
 
     } else if (e.kind === 'ip-discharge') {
       const ipBed = e.bed;
@@ -1066,6 +1077,8 @@ function processEventsUpTo(targetT, maxEvents) {
     for (const b of live.edBeds) {
       if (b.state === 'workup' && b.pt.workupEndTime < nextT) {
         nextT = b.pt.workupEndTime; nextKind = 'workup-end'; nextRef = b;
+      } else if (b.state === 'boarder' && !b.pt.transferReady && b.pt.earliestLeaveTime < nextT) {
+        nextT = b.pt.earliestLeaveTime; nextKind = 'transfer-ready'; nextRef = b;
       }
     }
     for (const b of live.ipBeds) {
@@ -1102,18 +1115,23 @@ function processEventsUpTo(targetT, maxEvents) {
         bed.timeEl.textContent = '';
         fillEDFromWR(nextT);
       } else {
-        const ip = live.ipBeds.find(b => b.state === 'empty');
-        if (ip) {
-          // immediate transfer — no boarder time
-          pt.boarderStartTime = nextT;
-          transferBoarderToIP(bed, ip, nextT);
-          fillEDFromWR(nextT);
-        } else {
-          bed.state = 'boarder';
-          pt.boarderStartTime = nextT;
-          bed.el.classList.remove('workup');
-          bed.el.classList.add('boarder');
-        }
+        // every admit boards for at least transferDelay before they can leave
+        bed.state = 'boarder';
+        pt.boarderStartTime = nextT;
+        pt.transferReady = false;
+        pt.earliestLeaveTime = nextT + live.cfg.transferDelay;
+        bed.el.classList.remove('workup');
+        bed.el.classList.add('boarder');
+      }
+
+    } else if (nextKind === 'transfer-ready') {
+      const bed = nextRef;
+      if (bed.state !== 'boarder' || bed.pt.transferReady) continue;
+      bed.pt.transferReady = true;
+      const ip = live.ipBeds.find(b => b.state === 'empty');
+      if (ip) {
+        transferBoarderToIP(bed, ip, nextT);
+        fillEDFromWR(nextT);
       }
 
     } else if (nextKind === 'ip-discharge') {
@@ -1121,10 +1139,11 @@ function processEventsUpTo(targetT, maxEvents) {
 
     } else if (nextKind === 'tat-end') {
       clearIPBed(nextRef);
-      // pull oldest boarder
+      // pull oldest boarder who is transfer-ready (past their delay)
       let oldest = null;
       for (const b of live.edBeds) {
-        if (b.state === 'boarder' && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
+        if (b.state === 'boarder' && b.pt.transferReady
+            && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
           oldest = b;
         }
       }
@@ -1343,6 +1362,7 @@ function readCfg() {
     dcHour:        +document.getElementById('cfg-dc-hour').value,
     dcSigma:       +document.getElementById('cfg-dc-sigma').value,
     tat:           +document.getElementById('cfg-tat').value,
+    transferDelay: +document.getElementById('cfg-xfer').value,
     lwbs:          +document.getElementById('cfg-lwbs').value,
     arrivalRate:   +document.getElementById('cfg-arr').value,
     simHours:      +document.getElementById('cfg-hours').value,
@@ -1397,6 +1417,7 @@ function resetDefaults() {
   document.getElementById('cfg-dc-hour').value = 12;
   document.getElementById('cfg-dc-sigma').value = 2.5;
   document.getElementById('cfg-tat').value = 2;
+  document.getElementById('cfg-xfer').value = 1;
   document.getElementById('cfg-lwbs').value = 4;
   document.getElementById('cfg-arr').value = 7;
   document.getElementById('cfg-hours').value = 168;
@@ -1834,7 +1855,7 @@ window.addEventListener('resize', () => {
 // Re-init the live grid when params change (debounced)
 let cfgChangeTimer = null;
 ['cfg-beds','cfg-ip-beds','cfg-admit','cfg-los-d','cfg-ip-los','cfg-los-sigma',
- 'cfg-dc-hour','cfg-dc-sigma','cfg-tat','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
+ 'cfg-dc-hour','cfg-dc-sigma','cfg-tat','cfg-xfer','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
     clearTimeout(cfgChangeTimer);
     cfgChangeTimer = setTimeout(() => {
