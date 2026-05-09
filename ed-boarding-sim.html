@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ED Boarding · Monte Carlo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+:root {
+  --bg: #0a0e14;
+  --s1: #111720;
+  --s2: #171e2a;
+  --s3: #1c2535;
+  --border: #243047;
+  --border2: #2e3d55;
+  --gold: #c9943a;
+  --gold2: #e8b96a;
+  --blue: #4d9de0;
+  --red: #e05a5a;
+  --green: #4caf82;
+  --yellow: #d4a94a;
+  --text: #dde4ef;
+  --muted: #6e8099;
+  --faint: #2e3d55;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  padding: 0 0 80px;
+}
+
+.masthead {
+  background: linear-gradient(180deg, #0d1520 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 36px 28px 28px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.masthead-eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+.masthead h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(30px, 5vw, 50px);
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.05;
+  margin-bottom: 10px;
+}
+.masthead h1 em { color: var(--gold); font-style: normal; }
+.masthead-sub {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 720px;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 28px; }
+
+.card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.card-hd {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-hd::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Controls */
+.ctrls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+.ctrl label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.ctrl input[type="number"] {
+  width: 100%;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 11px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  -moz-appearance: textfield;
+}
+.ctrl input[type="number"]:focus { border-color: var(--blue); }
+.ctrl input[type="number"]::-webkit-inner-spin-button { display: none; }
+.ctrl .hint { font-size: 9px; color: var(--faint); margin-top: 4px; line-height: 1.4; }
+
+.btn-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.btn {
+  background: var(--gold);
+  color: #000;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: background 0.15s;
+}
+.btn:hover { background: var(--gold2); }
+.btn.secondary { background: transparent; border: 1px solid var(--border2); color: var(--muted); }
+.btn.secondary:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Stats tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; }
+.tile {
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.tile.hl { border-color: var(--gold); background: rgba(201,148,58,0.05); }
+.tile.warn { border-color: var(--red); background: rgba(224,90,90,0.06); }
+.tile-lbl {
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 5px;
+}
+.tile-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-style: italic;
+  line-height: 1;
+}
+.tile-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+/* Charts */
+.chart-wrap { position: relative; }
+canvas { display: block; width: 100%; height: auto; }
+
+.legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: 10px; color: var(--muted);
+  margin-top: 10px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-sw { width: 14px; height: 10px; border-radius: 2px; }
+
+.refs { font-size: 10px; color: var(--muted); line-height: 1.85; }
+.refs strong { color: var(--text); }
+
+.disclaimer {
+  margin-top: 24px; padding: 14px 16px;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  font-size: 10px; color: var(--muted); line-height: 1.75;
+}
+.disclaimer strong { color: var(--red); }
+
+/* ─── LIVE ANIMATION ─── */
+.live-hud {
+  display: flex;
+  gap: 22px;
+  padding: 14px 18px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hud-item { display: flex; flex-direction: column; gap: 2px; min-width: 60px; }
+.hud-lbl { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.hud-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-style: italic;
+  line-height: 1;
+  color: var(--text);
+}
+
+.live-controls {
+  display: flex; gap: 14px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.btn.small { padding: 8px 14px; font-size: 11px; }
+.speed-ctrl {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; color: var(--muted);
+  margin-left: auto;
+}
+.rep-picker { display: flex; align-items: center; gap: 6px; }
+.rep-label {
+  font-size: 10px; color: var(--muted);
+  min-width: 80px; text-align: center;
+  font-family: 'DM Mono', monospace;
+}
+.rep-label #rep-idx { color: var(--gold); font-weight: 500; }
+.speed-ctrl input[type="range"] {
+  width: 160px; accent-color: var(--gold);
+  background: var(--border); height: 4px; border-radius: 2px; outline: none;
+}
+#speed-val { color: var(--gold); min-width: 30px; display: inline-block; text-align: right; }
+
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 7px;
+  padding: 16px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.bed {
+  position: relative;
+  aspect-ratio: 1.3 / 1;
+  border-radius: 6px;
+  border: 1px solid var(--faint);
+  background: rgba(255,255,255,0.015);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--faint);
+  contain: layout style paint;
+}
+.bed-num {
+  position: absolute; top: 3px; left: 5px;
+  font-size: 8px; color: var(--faint);
+  letter-spacing: 0.05em;
+}
+.bed svg.bed-icon { width: 78%; height: 70%; display: block; }
+.bed .patient { opacity: 0; transition: opacity 0.4s ease; }
+.bed.occupied .patient { opacity: 1; }
+
+.bed.workup {
+  background: rgba(77,157,224,0.13);
+  border-color: rgba(77,157,224,0.55);
+  box-shadow: 0 0 10px rgba(77,157,224,0.18) inset;
+  color: #4d9de0;
+}
+.bed.boarder {
+  background: rgba(224,90,90,0.22);
+  border-color: rgba(224,90,90,0.7);
+  box-shadow: 0 0 10px rgba(224,90,90,0.3) inset;
+  color: #e05a5a;
+}
+.bed-time {
+  position: absolute; bottom: 3px; right: 5px;
+  font-size: 8px;
+  font-family: 'DM Mono', monospace;
+  color: inherit; opacity: 0;
+  transition: opacity 0.3s;
+}
+.bed.occupied .bed-time { opacity: 0.85; }
+
+
+/* IP grid (compact) */
+.ip-section {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.ip-section-hd {
+  font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--blue); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ip-grid {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 3px;
+}
+.ip-bed {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  border: 1px solid var(--faint);
+  background: rgba(255,255,255,0.015);
+  position: relative;
+  contain: layout style paint;
+}
+.ip-bed.occupied {
+  background: #6b8eaf;
+  border-color: #88a4c2;
+}
+.ip-bed.turnaround {
+  background: #d4a94a;
+  border-color: #e8c570;
+  opacity: 0.85;
+}
+@media(max-width:720px) {
+  .ip-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+}
+
+.queue-display {
+  padding: 12px 16px;
+  background: var(--s2);
+  border: 1px dashed rgba(212,169,74,0.4);
+  border-radius: 8px;
+  display: flex; gap: 14px; align-items: center;
+  min-height: 50px;
+}
+.queue-lbl {
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); flex-shrink: 0;
+}
+.queue-icons {
+  display: flex; gap: 5px; flex-wrap: wrap; flex: 1;
+  align-items: center; min-height: 22px;
+}
+.q-pt {
+  width: 12px; height: 18px;
+  background: var(--yellow);
+  border-radius: 2px 2px 4px 4px;
+  opacity: 0.85;
+  animation: qAppear 0.35s ease;
+  position: relative;
+}
+.q-pt::before {
+  content: ''; position: absolute;
+  top: -5px; left: 2px;
+  width: 8px; height: 6px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+@keyframes qAppear {
+  from { opacity: 0; transform: translateY(-6px) scale(0.6); }
+  to   { opacity: 0.85; transform: none; }
+}
+.queue-empty {
+  font-size: 10px; color: var(--faint); font-style: italic;
+}
+
+@media(max-width:720px) {
+  .bed-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media(max-width:560px){
+  .wrap { padding: 16px; }
+  .masthead{padding:24px 16px 20px;}
+  .speed-ctrl { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-eyebrow">Operations · Monte Carlo Simulation</div>
+  <h1>ED Boarding<br><em>Monte Carlo Bed Model</em></h1>
+  <p class="masthead-sub">
+    Coupled ED + inpatient discrete-event simulation. ED arrivals follow a Poisson process;
+    after an ED workup period each visit either discharges or is admitted. Admitted patients
+    board in the ED until an inpatient bed is available. IP discharges concentrate around
+    a configurable hour (default noon) — each discharged bed enters a turnaround/cleaning
+    interval before the next boarder can occupy it. Boarder time emerges from the system,
+    not as a fixed LOS.
+  </p>
+</div>
+
+<div class="wrap">
+
+  <!-- CONFIG -->
+  <div class="card">
+    <div class="card-hd">Simulation Parameters</div>
+    <div class="ctrls">
+      <div class="ctrl">
+        <label>ED Beds</label>
+        <input type="number" id="cfg-beds" value="50" min="1" step="1">
+        <div class="hint">ED capacity</div>
+      </div>
+      <div class="ctrl">
+        <label>IP Beds</label>
+        <input type="number" id="cfg-ip-beds" value="120" min="1" step="1">
+        <div class="hint">Inpatient capacity</div>
+      </div>
+      <div class="ctrl">
+        <label>Arrivals / hr</label>
+        <input type="number" id="cfg-arr" value="7" min="0.1" step="0.1">
+        <div class="hint">Poisson λ</div>
+      </div>
+      <div class="ctrl">
+        <label>Admit Rate (%)</label>
+        <input type="number" id="cfg-admit" value="12" min="0" max="100" step="0.5">
+        <div class="hint">Fraction admitted</div>
+      </div>
+      <div class="ctrl">
+        <label>ED Workup (hr)</label>
+        <input type="number" id="cfg-los-d" value="4" min="0.1" step="0.1">
+        <div class="hint">Pre-disposition</div>
+      </div>
+      <div class="ctrl">
+        <label>IP LOS (days)</label>
+        <input type="number" id="cfg-ip-los" value="5" min="0.1" step="0.1">
+        <div class="hint">Mean (log-normal)</div>
+      </div>
+      <div class="ctrl">
+        <label>LOS σ (log)</label>
+        <input type="number" id="cfg-los-sigma" value="0.6" min="0.05" max="2" step="0.05">
+        <div class="hint">0.6 ≈ realistic</div>
+      </div>
+      <div class="ctrl">
+        <label>DC Hour</label>
+        <input type="number" id="cfg-dc-hour" value="12" min="0" max="23" step="0.5">
+        <div class="hint">0–23 (12 = noon)</div>
+      </div>
+      <div class="ctrl">
+        <label>DC Spread σ (hr)</label>
+        <input type="number" id="cfg-dc-sigma" value="2.5" min="0.1" step="0.1">
+        <div class="hint">Gaussian noise</div>
+      </div>
+      <div class="ctrl">
+        <label>Transfer Delay (hr)</label>
+        <input type="number" id="cfg-xfer" value="1" min="0" step="0.1">
+        <div class="hint">Min ED dwell post-admit</div>
+      </div>
+      <div class="ctrl">
+        <label>TAT (hr)</label>
+        <input type="number" id="cfg-tat" value="2" min="0" step="0.1">
+        <div class="hint">IP bed cleaning</div>
+      </div>
+      <div class="ctrl">
+        <label>LWBS Threshold (hr)</label>
+        <input type="number" id="cfg-lwbs" value="4" min="0" step="0.5">
+        <div class="hint">Wait → leave</div>
+      </div>
+      <div class="ctrl">
+        <label>Sim Length (hr)</label>
+        <input type="number" id="cfg-hours" value="168" min="24" step="1">
+        <div class="hint">168 = 1 wk</div>
+      </div>
+      <div class="ctrl">
+        <label>Replicates</label>
+        <input type="number" id="cfg-reps" value="30" min="1" max="500" step="1">
+        <div class="hint">Monte Carlo runs</div>
+      </div>
+      <div class="ctrl">
+        <label>Random Seed</label>
+        <input type="number" id="cfg-seed" value="42" min="0" step="1">
+        <div class="hint">Reproducibility</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="runSim()">▶ Run Monte Carlo (all replicates)</button>
+      <button class="btn secondary" onclick="resetDefaults()">Reset Defaults</button>
+      <span id="status" style="font-size:10px;color:var(--muted);align-self:center;margin-left:8px;"></span>
+    </div>
+  </div>
+
+  <!-- ─── LIVE ED FLOOR ─── -->
+  <div class="card">
+    <div class="card-hd">Live ED Floor <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— watch beds fill, patients work up, admits become boarders</span></div>
+
+    <div class="live-hud">
+      <div class="hud-item"><span class="hud-lbl">Sim Time</span><span class="hud-val" id="hud-time">0.0 hr</span></div>
+      <div class="hud-item"><span class="hud-lbl">Day · Hr</span><span class="hud-val" id="hud-day">1 · 00:00</span></div>
+      <div class="hud-item"><span class="hud-lbl">ED Occ</span><span class="hud-val" id="hud-occ">0 / 50</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#4d9de0;">Workup</span><span class="hud-val" id="hud-workup" style="color:#4d9de0;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#e05a5a;">Boarding</span><span class="hud-val" id="hud-board" style="color:#e05a5a;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#d4a94a;">Waiting</span><span class="hud-val" id="hud-queue" style="color:#d4a94a;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#6b8eaf;">IP Occ</span><span class="hud-val" id="hud-ip" style="color:#6b8eaf;">0 / 120</span></div>
+      <div class="hud-item"><span class="hud-lbl">Avg Board</span><span class="hud-val" id="hud-avg-board">— hr</span></div>
+      <div class="hud-item"><span class="hud-lbl">LWBS</span><span class="hud-val" id="hud-lwbs">0</span></div>
+    </div>
+
+    <div class="live-controls">
+      <button class="btn small" id="btn-play" onclick="togglePlay()">▶ Play</button>
+      <button class="btn small secondary" onclick="restartLive()">↻ Restart</button>
+      <div class="rep-picker">
+        <button class="btn small secondary" onclick="changeRep(-1)" title="Previous replicate">◀</button>
+        <span class="rep-label">Rep <span id="rep-idx">1</span> / <span id="rep-total">30</span></span>
+        <button class="btn small secondary" onclick="changeRep(1)" title="Next replicate">▶</button>
+      </div>
+      <label class="speed-ctrl">
+        <span><span id="speed-val">0.50</span> sim hr / sec</span>
+        <input type="range" id="speed-slider" min="0.1" max="8" step="0.1" value="0.5" oninput="onSpeedChange()">
+      </label>
+    </div>
+
+    <div style="font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">Emergency Department</div>
+    <div class="bed-grid" id="bed-grid"></div>
+
+    <div class="queue-display">
+      <div class="queue-lbl">Waiting Room</div>
+      <div class="queue-icons" id="queue-icons"><span class="queue-empty">no patients waiting</span></div>
+    </div>
+
+    <div class="ip-section">
+      <div class="ip-section-hd">
+        Inpatient Unit
+        <span style="color:var(--muted);letter-spacing:0;text-transform:none;font-size:9px;">— LOS ~5d, discharges concentrate near</span>
+        <span id="ip-dc-hour-lbl" style="color:var(--gold);letter-spacing:0;text-transform:none;font-size:9px;">12:00</span>
+      </div>
+      <div class="ip-grid" id="ip-grid"></div>
+    </div>
+
+    <div class="legend" style="margin-top:12px;">
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(77,157,224,0.5);border:1px solid rgba(77,157,224,0.7);"></span>ED workup (blue)</div>
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(224,90,90,0.6);border:1px solid rgba(224,90,90,0.7);"></span>ED boarder (red) — waiting for IP bed</div>
+      <div class="legend-item"><span class="legend-sw" style="background:var(--yellow);"></span>ED waiting room</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#6b8eaf;"></span>IP occupied</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#d4a94a;"></span>IP turnaround / cleaning</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="card">
+    <div class="card-hd">Aggregate Statistics <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— mean across replicates (warmup discarded)</span></div>
+    <div class="tiles" id="stats-tiles"></div>
+  </div>
+
+  <!-- OCCUPANCY CHART -->
+  <div class="card">
+    <div class="card-hd">Bed Occupancy Over Time <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— sample replicate (run #1)</span></div>
+    <div class="chart-wrap"><canvas id="occChart" width="1000" height="320"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-sw" style="background:#4d9de0;"></span>ED workup</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#e05a5a;"></span>Boarders awaiting IP bed</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#d4a94a;width:2px;"></span>Waiting room overflow</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#c9943a;height:2px;margin-top:4px;"></span>ED capacity</div>
+    </div>
+  </div>
+
+  <!-- BOARDERS + QUEUE CHART -->
+  <div class="card">
+    <div class="card-hd">Boarders & Waiting Queue <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— ensemble mean ± P5–P95 across replicates</span></div>
+    <div class="chart-wrap"><canvas id="boardChart" width="1000" height="280"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-sw" style="background:#e05a5a;"></span>Boarders (mean)</div>
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(224,90,90,0.18);"></span>Boarders P5–P95</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#d4a94a;"></span>Waiting queue (mean)</div>
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(212,169,74,0.18);"></span>Queue P5–P95</div>
+    </div>
+  </div>
+
+  <!-- HISTOGRAM -->
+  <div class="card">
+    <div class="card-hd">Distribution of Peak Metrics <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— histogram across replicates</span></div>
+    <div class="chart-wrap"><canvas id="histChart" width="1000" height="240"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-sw" style="background:#e05a5a;"></span>Max boarders per replicate</div>
+      <div class="legend-item"><span class="legend-sw" style="background:#d4a94a;"></span>Max queue per replicate</div>
+    </div>
+  </div>
+
+  <!-- INTERPRETATION -->
+  <div class="card">
+    <div class="card-hd">Reading the Output</div>
+    <div style="font-size:11px;line-height:1.8;color:var(--text);">
+      <strong style="color:var(--gold);">Boarder time is endogenous:</strong> a boarder leaves the ED only when an IP bed clears + completes turnaround. Tighter IP capacity → longer boarder times → backed-up ED → waiting room → LWBS.<br>
+      <strong style="color:var(--gold);">Noon discharge clustering:</strong> IP beds become available in a daily wave around the configured DC hour. Watch the IP grid turn yellow (turnaround) mid-day, then re-fill from boarders. Boarders pile up overnight and clear after noon.<br>
+      <strong style="color:var(--gold);">IP utilization:</strong> admit-rate × arrivals × IP-LOS / IP-beds. With defaults (0.84/hr × 5.5d / 120 = 0.92), IP runs hot — small perturbations cause cascading delays.<br>
+      <strong style="color:var(--gold);">Effective IP LOS:</strong> the entered "IP LOS (days)" is the <em>mean</em> of a log-normal distribution. Individual stays vary around it (default σ=0.6 → ~70% of patients between p15 and p85, with a long upper tail). Rounding each patient's "ready time" forward to the next noon DC adds ~12 hr on top, so effective mean ≈ entered value + 0.5 day. Adjust IP-LOS-days down to ~4.5 if you want true 5d effective LOS.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">Model Notes</div>
+    <div class="refs">
+      <strong>Coupling:</strong> ED bed → ED workup → either discharge (88%) or boarder (12%) → after Transfer Delay (handoff/transport, default 1 hr) → IP bed → IP LOS → discharge → turnaround → IP bed reopens to next ready boarder. Boarders are FIFO; oldest <em>transfer-ready</em> boarder claims the next available IP bed.<br>
+      <strong>Transfer Delay:</strong> minimum ED dwell time after admit decision, even when an IP bed is already empty. Captures handoff, transport, and bed-board lag. Each admit has avg boarder time ≥ Transfer Delay.<br>
+      <strong>Arrival process:</strong> homogeneous Poisson (constant λ) — no time-of-day or day-of-week variation. Real EDs peak afternoons / evenings.<br>
+      <strong>ED workup:</strong> exponential with the entered mean (default 4 hr). Applies to all comers; admit decision happens at end of workup.<br>
+      <strong>IP LOS:</strong> log-normal with target mean = IP-LOS-days × 24 hr and log-space σ (default 0.6 → CV ≈ 0.66, realistic for hospital data; CV = 1 corresponds to exponential). Each patient's "ready time" is then pushed forward to the next configured DC hour ± Gaussian noise (DC σ).<br>
+      <strong>Turnaround (TAT):</strong> exponential mean 2 hr by default — captures cleaning, bed-board lag, and patient transport.<br>
+      <strong>LWBS:</strong> waiting-room patients leave if their wait exceeds the threshold. Reasonable default is 4 hr.<br>
+      <strong>Warm start:</strong> live IP unit pre-fills to ~80% with random remaining LOS; Monte Carlo discards the first 48 hr as warmup.<br>
+      <strong>RNG:</strong> mulberry32 seeded PRNG so results are reproducible from the seed input.
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>⚠ Operations modeling tool.</strong> Outputs depend strongly on input assumptions (especially λ and admit-LOS).
+    Calibrate against your department's actual arrival rates and LOS distributions before using for staffing or capacity decisions.
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// Seedable RNG (mulberry32)
+// ════════════════════════════════════════════════════════
+function rng(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function expRand(r, mean) { return -Math.log(1 - r()) * mean; }
+function gaussRand(r, mean, sd) {
+  const u1 = Math.max(1e-9, r()), u2 = r();
+  return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+// Log-normal with target arithmetic mean and log-space sd σ.
+// In log-space: μ = ln(targetMean) − σ²/2, so E[X] = exp(μ + σ²/2) = targetMean.
+// CV = sqrt(exp(σ²) − 1). σ=0.6 → CV ≈ 0.66 (vs 1.0 for exponential).
+function lognormRand(r, targetMean, sigma) {
+  const mu = Math.log(targetMean) - sigma * sigma / 2;
+  return Math.exp(mu + sigma * gaussRand(r, 0, 1));
+}
+// Scheduled IP discharge time: next occurrence of dcHour after readyTime, ± gaussian noise
+function scheduleIPDischarge(readyTime, cfg, r) {
+  const day = Math.floor(readyTime / 24);
+  const targetSameDay = day * 24 + cfg.dcHour;
+  const target = targetSameDay >= readyTime ? targetSameDay : targetSameDay + 24;
+  const noise = gaussRand(r, 0, cfg.dcSigma);
+  return Math.max(readyTime, target + noise);
+}
+
+// ════════════════════════════════════════════════════════
+// Single replicate — coupled ED + IP discrete-event simulation
+// ════════════════════════════════════════════════════════
+function simulate(cfg, r) {
+  const events = [];
+  function pushEvent(e) {
+    let i = events.length;
+    while (i > 0 && events[i-1].time > e.time) i--;
+    events.splice(i, 0, e);
+  }
+
+  // Pre-generate arrivals (Poisson)
+  let at = 0;
+  while (true) {
+    at += expRand(r, 1 / cfg.arrivalRate);
+    if (at >= cfg.simHours) break;
+    pushEvent({
+      time: at, kind: 'arrival',
+      pt: { willAdmit: r() < cfg.admitRate, arriveTime: at }
+    });
+  }
+
+  // ED state
+  const edBeds = [];
+  for (let i = 0; i < cfg.beds; i++) edBeds.push({ state: 'empty', pt: null });
+  // IP state — pre-warm to ~80% with random remaining LOS so we don't spend the whole sim in cold-start
+  const ipBeds = [];
+  for (let i = 0; i < cfg.ipBeds; i++) ipBeds.push({ state: 'empty', pt: null });
+  const seedFill = Math.floor(cfg.ipBeds * 0.8);
+  for (let i = 0; i < seedFill; i++) {
+    const ipBed = ipBeds[i];
+    const losTotalHr = lognormRand(r, cfg.ipLosDays * 24, cfg.losSigma);
+    const tEntered = -r() * losTotalHr; // uniform elapsed-in-bed already
+    const ready = tEntered + losTotalHr;
+    const pt = { ipBedTime: tEntered, willAdmit: true, arriveTime: tEntered };
+    pt.ipDischargeTime = scheduleIPDischarge(Math.max(0, ready), cfg, r);
+    ipBed.state = 'occupied';
+    ipBed.pt = pt;
+    pushEvent({ time: pt.ipDischargeTime, kind: 'ip-discharge', bed: ipBed });
+  }
+
+  const waitingRoom = []; // FIFO of patients waiting for ED bed
+
+  // Counters
+  let totalArrivals = 0, lwbs = 0, edDischarged = 0, ipDischarged = 0;
+  let sumBoarderHr = 0, boarderCount = 0, maxBoarderHr = 0;
+  let sumWaitHr = 0, waitedCount = 0, maxWaitHr = 0;
+
+  // Helpers
+  function ipBedAvail() { return ipBeds.find(b => b.state === 'empty'); }
+  function edBedAvail() { return edBeds.find(b => b.state === 'empty'); }
+  function oldestBoarder() {
+    let oldest = null;
+    for (const b of edBeds) {
+      if (b.state === 'boarder' && b.pt.transferReady
+          && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
+        oldest = b;
+      }
+    }
+    return oldest;
+  }
+
+  function placeInEDBed(bed, pt, t) {
+    bed.state = 'workup';
+    bed.pt = pt;
+    pt.bedTime = t;
+    const workup = expRand(r, cfg.losDischarged);
+    pt.workupEndTime = t + workup;
+    pushEvent({ time: pt.workupEndTime, kind: 'ed-workup-end', bed });
+  }
+  function admitToIPBed(ipBed, pt, t) {
+    ipBed.state = 'occupied';
+    ipBed.pt = pt;
+    pt.ipBedTime = t;
+    const losHr = lognormRand(r, cfg.ipLosDays * 24, cfg.losSigma);
+    const ready = t + losHr;
+    pt.ipDischargeTime = scheduleIPDischarge(ready, cfg, r);
+    pushEvent({ time: pt.ipDischargeTime, kind: 'ip-discharge', bed: ipBed });
+  }
+  function startTurnaround(ipBed, t) {
+    ipBed.state = 'turnaround';
+    ipBed.pt = null;
+    const tat = expRand(r, cfg.tat);
+    ipBed.turnaroundEnd = t + tat;
+    pushEvent({ time: ipBed.turnaroundEnd, kind: 'ip-turnaround-end', bed: ipBed });
+  }
+  function dischargeBoarderToIP(edBed, ipBed, t) {
+    const pt = edBed.pt;
+    const boardHr = t - pt.boarderStartTime;
+    sumBoarderHr += boardHr;
+    boarderCount++;
+    if (boardHr > maxBoarderHr) maxBoarderHr = boardHr;
+    edBed.state = 'empty';
+    edBed.pt = null;
+    admitToIPBed(ipBed, pt, t);
+    // pull next from waiting room
+    fillEDFromWR(t);
+  }
+  function fillEDFromWR(t) {
+    while (waitingRoom.length > 0) {
+      const free = edBedAvail();
+      if (!free) break;
+      const pt = waitingRoom.shift();
+      const wait = t - pt.arriveTime;
+      sumWaitHr += wait;
+      waitedCount++;
+      if (wait > maxWaitHr) maxWaitHr = wait;
+      placeInEDBed(free, pt, t);
+    }
+  }
+  function purgeLWBS(t) {
+    // remove patients who've waited > LWBS threshold
+    for (let i = waitingRoom.length - 1; i >= 0; i--) {
+      if (t - waitingRoom[i].arriveTime >= cfg.lwbs) {
+        waitingRoom.splice(i, 1);
+        lwbs++;
+      }
+    }
+  }
+
+  // Sampling
+  const sampleDt = 0.25;
+  const samples = [];
+  let nextSampleT = 0;
+  function recordUntil(t) {
+    while (nextSampleT <= t && nextSampleT <= cfg.simHours) {
+      let workup = 0, boarding = 0, ipOcc = 0, tat = 0;
+      for (const b of edBeds) {
+        if (b.state === 'workup') workup++;
+        else if (b.state === 'boarder') boarding++;
+      }
+      for (const b of ipBeds) {
+        if (b.state === 'occupied') ipOcc++;
+        else if (b.state === 'turnaround') tat++;
+      }
+      samples.push({
+        t: nextSampleT,
+        workup, boarding,
+        edOccupied: workup + boarding,
+        queue: waitingRoom.length,
+        ipOcc, tat
+      });
+      nextSampleT += sampleDt;
+    }
+  }
+
+  // Periodic LWBS check — every 0.25 hr we also purge
+  while (events.length > 0) {
+    const e = events.shift();
+    if (e.time > cfg.simHours) break;
+    purgeLWBS(e.time);
+    recordUntil(e.time);
+
+    if (e.kind === 'arrival') {
+      totalArrivals++;
+      const free = edBedAvail();
+      if (free) placeInEDBed(free, e.pt, e.time);
+      else waitingRoom.push(e.pt);
+
+    } else if (e.kind === 'ed-workup-end') {
+      const bed = e.bed;
+      if (bed.state !== 'workup' || bed.pt.workupEndTime !== e.time) continue; // stale
+      const pt = bed.pt;
+      if (!pt.willAdmit) {
+        // discharge
+        bed.state = 'empty'; bed.pt = null;
+        edDischarged++;
+        fillEDFromWR(e.time);
+      } else {
+        // every admit boards for at least transferDelay hr — even if an IP
+        // bed is available right now, the patient still needs handoff +
+        // transport time before they actually leave the ED
+        bed.state = 'boarder';
+        pt.boarderStartTime = e.time;
+        pt.transferReady = false;
+        pt.earliestLeaveTime = e.time + cfg.transferDelay;
+        pushEvent({ time: pt.earliestLeaveTime, kind: 'transfer-ready', bed });
+      }
+
+    } else if (e.kind === 'transfer-ready') {
+      const bed = e.bed;
+      if (bed.state !== 'boarder' || bed.pt.transferReady) continue; // stale
+      bed.pt.transferReady = true;
+      // patient is now eligible to leave; if IP bed is open, take it
+      const ip = ipBedAvail();
+      if (ip) dischargeBoarderToIP(bed, ip, e.time);
+
+    } else if (e.kind === 'ip-discharge') {
+      const ipBed = e.bed;
+      if (ipBed.state !== 'occupied') continue;
+      ipDischarged++;
+      startTurnaround(ipBed, e.time);
+
+    } else if (e.kind === 'ip-turnaround-end') {
+      const ipBed = e.bed;
+      if (ipBed.state !== 'turnaround') continue;
+      ipBed.state = 'empty';
+      // pull oldest boarder
+      const ed = oldestBoarder();
+      if (ed) dischargeBoarderToIP(ed, ipBed, e.time);
+    }
+  }
+  purgeLWBS(cfg.simHours);
+  recordUntil(cfg.simHours);
+
+  return {
+    samples,
+    totalArrivals,
+    edDischarged, ipDischarged,
+    boarderCount,
+    avgBoardHr: boarderCount > 0 ? sumBoarderHr / boarderCount : 0,
+    maxBoardHr: maxBoarderHr,
+    waitedCount,
+    avgWaitHr: waitedCount > 0 ? sumWaitHr / waitedCount : 0,
+    maxWaitHr,
+    lwbs
+  };
+}
+
+// ════════════════════════════════════════════════════════
+// LIVE ANIMATED SIMULATION (coupled ED + IP)
+// ════════════════════════════════════════════════════════
+const live = {
+  cfg: null,
+  rng: null,
+  edBeds: [],          // [{id, state, pt, el, timeEl}]
+  ipBeds: [],          // [{id, state, pt, el}]
+  waitingRoom: [],     // [{arriveTime, willAdmit}]
+  arrivals: [],        // pre-generated
+  arrivalIdx: 0,
+  simTime: 0,
+  running: false,
+  speed: 0.5,
+  lastFrame: null,
+  totalSeen: 0,
+  lwbsCount: 0,
+  sumBoardHr: 0,
+  boarderCount: 0,
+  hudCache: {},        // last-written HUD values for change detection
+  lastBedTimeUpdate: 0,// sim hr of last bed-time text update
+  replicateIdx: 0,     // which MC replicate the live run corresponds to (0-based)
+  tickHandle: null
+};
+
+const hudEls = {}; // cached element references
+function setIfChanged(id, val) {
+  if (live.hudCache[id] !== val) {
+    (hudEls[id] || (hudEls[id] = document.getElementById(id))).textContent = val;
+    live.hudCache[id] = val;
+  }
+}
+
+function bedSVG() {
+  // simple top-down hospital bed icon, uses currentColor
+  return `<svg class="bed-icon" viewBox="0 0 60 40" preserveAspectRatio="xMidYMid meet">
+    <rect x="3" y="14" width="54" height="22" rx="3"
+          fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.7"/>
+    <rect x="6" y="17" width="13" height="9" rx="1.5"
+          fill="currentColor" opacity="0.35"/>
+    <g class="patient">
+      <circle cx="13" cy="22" r="3.2" fill="currentColor" opacity="0.95"/>
+      <rect x="18" y="19" width="34" height="7" rx="2.5" fill="currentColor" opacity="0.85"/>
+    </g>
+  </svg>`;
+}
+
+function buildBedGrid() {
+  const cfg = readCfg();
+  live.cfg = cfg;
+  // ED grid — reuse existing elements if count matches (avoids 170-elem
+  // teardown+rebuild on every Replay, which can OOM-kill mobile tabs)
+  const edGrid = document.getElementById('bed-grid');
+  edGrid.classList.remove('sim-ended');
+  if (live.edBeds.length === cfg.beds && live.edBeds.length > 0) {
+    for (const bed of live.edBeds) {
+      bed.state = 'empty';
+      bed.pt = null;
+      bed.el.className = 'bed';
+      bed.timeEl.textContent = '';
+    }
+  } else {
+    edGrid.innerHTML = '';
+    const edCols = Math.min(10, Math.ceil(Math.sqrt(cfg.beds * 1.6)));
+    edGrid.style.gridTemplateColumns = `repeat(${edCols}, minmax(0, 1fr))`;
+    live.edBeds = [];
+    for (let i = 0; i < cfg.beds; i++) {
+      const div = document.createElement('div');
+      div.className = 'bed';
+      div.id = 'bed-' + i;
+      div.innerHTML = `<span class="bed-num">${String(i+1).padStart(2,'0')}</span>${bedSVG()}<span class="bed-time"></span>`;
+      edGrid.appendChild(div);
+      live.edBeds.push({
+        id: i, state: 'empty', pt: null,
+        el: div, timeEl: div.querySelector('.bed-time')
+      });
+    }
+  }
+  // IP grid — same reuse strategy
+  const ipGrid = document.getElementById('ip-grid');
+  ipGrid.classList.remove('sim-ended');
+  if (live.ipBeds.length === cfg.ipBeds && live.ipBeds.length > 0) {
+    for (const bed of live.ipBeds) {
+      bed.state = 'empty';
+      bed.pt = null;
+      bed.el.className = 'ip-bed';
+    }
+  } else {
+    ipGrid.innerHTML = '';
+    const ipCols = Math.min(20, Math.ceil(Math.sqrt(cfg.ipBeds * 1.8)));
+    ipGrid.style.gridTemplateColumns = `repeat(${ipCols}, minmax(0, 1fr))`;
+    live.ipBeds = [];
+    for (let i = 0; i < cfg.ipBeds; i++) {
+      const div = document.createElement('div');
+      div.className = 'ip-bed';
+      div.title = 'IP bed ' + (i+1);
+      ipGrid.appendChild(div);
+      live.ipBeds.push({ id: i, state: 'empty', pt: null, el: div });
+    }
+  }
+  // DC hour label
+  const dh = cfg.dcHour;
+  const hh = Math.floor(dh), mm = Math.round((dh-hh)*60);
+  document.getElementById('ip-dc-hour-lbl').textContent =
+    String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+
+function initLive() {
+  buildBedGrid();
+  const cfg = live.cfg;
+  // clamp replicate index to current cfg.replicates
+  if (live.replicateIdx >= cfg.replicates) live.replicateIdx = cfg.replicates - 1;
+  if (live.replicateIdx < 0) live.replicateIdx = 0;
+  // SAME seed formula as Monte Carlo replicate live.replicateIdx
+  // → live animation IS replicate N of the ensemble below
+  live.rng = rng((cfg.seed + live.replicateIdx * 1000003) >>> 0);
+  updateRepLabel();
+  // pre-generate arrivals
+  live.arrivals = [];
+  let t = 0;
+  while (true) {
+    t += expRand(live.rng, 1 / cfg.arrivalRate);
+    if (t >= cfg.simHours) break;
+    live.arrivals.push({ time: t, willAdmit: live.rng() < cfg.admitRate });
+  }
+  // pre-fill IP unit at ~80% with random remaining LOS to avoid cold-start artifacts
+  const seedFill = Math.floor(cfg.ipBeds * 0.8);
+  for (let i = 0; i < seedFill; i++) {
+    const ipBed = live.ipBeds[i];
+    const losTotalHr = lognormRand(live.rng, cfg.ipLosDays * 24, cfg.losSigma);
+    const fakeTime = -live.rng() * losTotalHr; // uniform elapsed-in-bed already
+    const pt = { ipBedTime: fakeTime, willAdmit: true, arriveTime: fakeTime };
+    ipBed.state = 'occupied';
+    ipBed.pt = pt;
+    const ready = fakeTime + losTotalHr;
+    pt.ipDischargeTime = scheduleIPDischarge(Math.max(0, ready), cfg, live.rng);
+    ipBed.el.classList.add('occupied');
+  }
+  live.arrivalIdx = 0;
+  live.waitingRoom = [];
+  live.simTime = 0;
+  live.totalSeen = 0;
+  live.lwbsCount = 0;
+  live.sumBoardHr = 0;
+  live.boarderCount = 0;
+  live.lastFrame = null;
+  live.hudCache = {};
+  live.lastBedTimeUpdate = -1;
+  renderHUD();
+  renderQueue();
+}
+
+function placeInEDBed(bed, pt, t) {
+  bed.state = 'workup';
+  bed.pt = pt;
+  pt.bedTime = t;
+  const workup = expRand(live.rng, live.cfg.losDischarged);
+  pt.workupEndTime = t + workup;
+  if (!bed.el.classList.contains('occupied')) bed.el.classList.add('occupied');
+  if (!bed.el.classList.contains('workup'))   bed.el.classList.add('workup');
+  if (bed.el.classList.contains('boarder'))   bed.el.classList.remove('boarder');
+}
+function admitToIPBed(ipBed, pt, t) {
+  ipBed.state = 'occupied';
+  ipBed.pt = pt;
+  pt.ipBedTime = t;
+  const losHr = lognormRand(live.rng, live.cfg.ipLosDays * 24, live.cfg.losSigma);
+  pt.ipDischargeTime = scheduleIPDischarge(t + losHr, live.cfg, live.rng);
+  ipBed.el.classList.remove('turnaround');
+  ipBed.el.classList.add('occupied');
+}
+function startIPTurnaround(ipBed, t) {
+  ipBed.state = 'turnaround';
+  ipBed.pt = null;
+  ipBed.turnaroundEnd = t + expRand(live.rng, live.cfg.tat);
+  ipBed.el.classList.remove('occupied');
+  ipBed.el.classList.add('turnaround');
+}
+function clearIPBed(ipBed) {
+  ipBed.state = 'empty';
+  ipBed.pt = null;
+  ipBed.el.classList.remove('occupied', 'turnaround');
+}
+function transferBoarderToIP(edBed, ipBed, t) {
+  const pt = edBed.pt;
+  const boardHr = t - (pt.boarderStartTime || t);
+  live.sumBoardHr += boardHr;
+  live.boarderCount++;
+  edBed.state = 'empty';
+  edBed.pt = null;
+  edBed.el.classList.remove('occupied', 'workup', 'boarder');
+  edBed.timeEl.textContent = '';
+  admitToIPBed(ipBed, pt, t);
+}
+function fillEDFromWR(t) {
+  while (live.waitingRoom.length > 0) {
+    const free = live.edBeds.find(b => b.state === 'empty');
+    if (!free) break;
+    const pt = live.waitingRoom.shift();
+    placeInEDBed(free, pt, t);
+  }
+}
+function purgeLWBS(t) {
+  for (let i = live.waitingRoom.length - 1; i >= 0; i--) {
+    if (t - live.waitingRoom[i].arriveTime >= live.cfg.lwbs) {
+      live.waitingRoom.splice(i, 1);
+      live.lwbsCount++;
+    }
+  }
+}
+
+function processEventsUpTo(targetT, maxEvents) {
+  // never advance past the configured sim end
+  targetT = Math.min(targetT, live.cfg.simHours);
+  let processed = 0;
+  let lastEventT = live.simTime;
+  while (maxEvents === undefined || processed < maxEvents) {
+    let nextT = Infinity, nextKind = null, nextRef = null;
+
+    if (live.arrivalIdx < live.arrivals.length) {
+      const a = live.arrivals[live.arrivalIdx];
+      if (a.time < nextT) { nextT = a.time; nextKind = 'arrival'; nextRef = a; }
+    }
+    for (const b of live.edBeds) {
+      if (b.state === 'workup' && b.pt.workupEndTime < nextT) {
+        nextT = b.pt.workupEndTime; nextKind = 'workup-end'; nextRef = b;
+      } else if (b.state === 'boarder' && !b.pt.transferReady && b.pt.earliestLeaveTime < nextT) {
+        nextT = b.pt.earliestLeaveTime; nextKind = 'transfer-ready'; nextRef = b;
+      }
+    }
+    for (const b of live.ipBeds) {
+      if (b.state === 'occupied' && b.pt.ipDischargeTime < nextT) {
+        nextT = b.pt.ipDischargeTime; nextKind = 'ip-discharge'; nextRef = b;
+      } else if (b.state === 'turnaround' && b.turnaroundEnd < nextT) {
+        nextT = b.turnaroundEnd; nextKind = 'tat-end'; nextRef = b;
+      }
+    }
+    // also process LWBS if next waiting patient would expire before nextT
+    // WR is strict FIFO by arrival time, so the head has the earliest LWBS exp
+    if (live.waitingRoom.length > 0) {
+      const exp = live.waitingRoom[0].arriveTime + live.cfg.lwbs;
+      if (exp < nextT) { nextT = exp; nextKind = 'lwbs'; nextRef = null; }
+    }
+
+    if (nextT > targetT || nextT === Infinity) break;
+
+    if (nextKind === 'arrival') {
+      const a = nextRef;
+      live.arrivalIdx++;
+      live.totalSeen++;
+      const pt = { willAdmit: a.willAdmit, arriveTime: a.time };
+      const free = live.edBeds.find(b => b.state === 'empty');
+      if (free) placeInEDBed(free, pt, a.time);
+      else live.waitingRoom.push(pt);
+
+    } else if (nextKind === 'workup-end') {
+      const bed = nextRef;
+      const pt = bed.pt;
+      if (!pt.willAdmit) {
+        bed.state = 'empty'; bed.pt = null;
+        bed.el.classList.remove('occupied', 'workup', 'boarder');
+        bed.timeEl.textContent = '';
+        fillEDFromWR(nextT);
+      } else {
+        // every admit boards for at least transferDelay before they can leave
+        bed.state = 'boarder';
+        pt.boarderStartTime = nextT;
+        pt.transferReady = false;
+        pt.earliestLeaveTime = nextT + live.cfg.transferDelay;
+        bed.el.classList.remove('workup');
+        bed.el.classList.add('boarder');
+      }
+
+    } else if (nextKind === 'transfer-ready') {
+      const bed = nextRef;
+      if (bed.state !== 'boarder' || bed.pt.transferReady) continue;
+      bed.pt.transferReady = true;
+      const ip = live.ipBeds.find(b => b.state === 'empty');
+      if (ip) {
+        transferBoarderToIP(bed, ip, nextT);
+        fillEDFromWR(nextT);
+      }
+
+    } else if (nextKind === 'ip-discharge') {
+      startIPTurnaround(nextRef, nextT);
+
+    } else if (nextKind === 'tat-end') {
+      clearIPBed(nextRef);
+      // pull oldest boarder who is transfer-ready (past their delay)
+      let oldest = null;
+      for (const b of live.edBeds) {
+        if (b.state === 'boarder' && b.pt.transferReady
+            && (!oldest || b.pt.boarderStartTime < oldest.pt.boarderStartTime)) {
+          oldest = b;
+        }
+      }
+      if (oldest) {
+        transferBoarderToIP(oldest, nextRef, nextT);
+        fillEDFromWR(nextT);
+      }
+
+    } else if (nextKind === 'lwbs') {
+      purgeLWBS(nextT);
+    }
+    processed++;
+    lastEventT = nextT;
+  }
+  // If we ran out of event budget, only advance to the last event we processed.
+  // Otherwise advance all the way to targetT.
+  if (maxEvents !== undefined && processed >= maxEvents) {
+    live.simTime = Math.min(lastEventT, live.cfg.simHours);
+  } else {
+    live.simTime = Math.min(targetT, live.cfg.simHours);
+  }
+}
+
+function renderHUD() {
+  let occ = 0, workup = 0, board = 0, ipOcc = 0;
+  for (const bed of live.edBeds) {
+    if (bed.state !== 'empty') {
+      occ++;
+      if (bed.state === 'workup') workup++;
+      else if (bed.state === 'boarder') board++;
+    }
+  }
+  for (const b of live.ipBeds) if (b.state === 'occupied') ipOcc++;
+
+  // throttle bed-time text updates to ~5Hz of sim time (i.e., every 0.2 sim hr)
+  if (live.simTime - live.lastBedTimeUpdate > 0.2 || live.simTime === 0) {
+    live.lastBedTimeUpdate = live.simTime;
+    for (const bed of live.edBeds) {
+      if (bed.state !== 'empty' && bed.pt) {
+        const elapsed = bed.state === 'boarder'
+          ? live.simTime - (bed.pt.boarderStartTime || bed.pt.bedTime)
+          : live.simTime - bed.pt.bedTime;
+        const txt = elapsed.toFixed(1) + 'h';
+        if (bed.timeEl.textContent !== txt) bed.timeEl.textContent = txt;
+      } else if (bed.timeEl.textContent !== '') {
+        bed.timeEl.textContent = '';
+      }
+    }
+  }
+
+  const dayNum = Math.floor(live.simTime / 24) + 1;
+  const hod = live.simTime - Math.floor(live.simTime / 24) * 24;
+  const hh = Math.floor(hod), mm = Math.floor((hod - hh) * 60);
+
+  // if Monte Carlo has been run, append "(μ X.X)" comparisons
+  const ens = ensembleAt(live.simTime);
+  const fmtCmp = (cur, mean) =>
+    ens ? ` <span style="color:var(--muted);font-size:11px;">μ ${mean.toFixed(1)}</span>` : '';
+
+  setIfChanged('hud-time', live.simTime.toFixed(1) + ' hr');
+  setIfChanged('hud-day',  dayNum + ' · ' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0'));
+  setIfChangedHTML('hud-occ',  occ + ' / ' + live.cfg.beds + (ens ? fmtCmp(occ, ens.ed) : ''));
+  setIfChanged('hud-workup', String(workup));
+  setIfChangedHTML('hud-board',  String(board) + (ens ? fmtCmp(board, ens.board) : ''));
+  setIfChangedHTML('hud-queue',  String(live.waitingRoom.length) + (ens ? fmtCmp(live.waitingRoom.length, ens.queue) : ''));
+  setIfChangedHTML('hud-ip',     ipOcc + ' / ' + live.cfg.ipBeds + (ens ? fmtCmp(ipOcc, ens.ip) : ''));
+  setIfChanged('hud-avg-board',
+    live.boarderCount > 0 ? (live.sumBoardHr / live.boarderCount).toFixed(1) + ' hr' : '— hr');
+  setIfChanged('hud-lwbs', String(live.lwbsCount));
+}
+
+// like setIfChanged but uses innerHTML so we can format embedded mean spans
+function setIfChangedHTML(id, html) {
+  if (live.hudCache[id] !== html) {
+    (hudEls[id] || (hudEls[id] = document.getElementById(id))).innerHTML = html;
+    live.hudCache[id] = html;
+  }
+}
+
+function renderQueue() {
+  const el = document.getElementById('queue-icons');
+  const N = live.waitingRoom.length;
+  // bucket so small fluctuations don't trigger DOM rebuilds
+  const bucket = N === 0 ? 0 : N < 12 ? N : Math.floor(N / 4) * 4;
+  if (bucket === live.hudCache._queueBucket) return;
+  live.hudCache._queueBucket = bucket;
+  if (N === 0) {
+    el.innerHTML = '<span class="queue-empty">no patients waiting</span>';
+    return;
+  }
+  const show = Math.min(N, 12);
+  let html = '';
+  for (let i = 0; i < show; i++) html += '<div class="q-pt"></div>';
+  html += `<span style="font-size:11px;color:var(--yellow);margin-left:8px;font-family:'Cormorant Garamond',serif;font-style:italic;">${N} waiting</span>`;
+  el.innerHTML = html;
+}
+
+function endLive() {
+  live.running = false;
+  if (live.tickHandle) { clearTimeout(live.tickHandle); live.tickHandle = null; }
+  document.getElementById('btn-play').textContent = '▶ Replay';
+  document.getElementById('bed-grid').classList.add('sim-ended');
+  document.getElementById('ip-grid').classList.add('sim-ended');
+}
+
+let lastRenderReal = 0;
+let stuckSimTime = -1, stuckSince = 0;
+const FRAME_EVENT_BUDGET = 80; // max events processed per tick; prevents long blocks
+const TICK_INTERVAL_MS = 33;   // ~30 Hz scheduler, more reliable than RAF on mobile under load
+
+function tick() {
+  if (!live.running) return;
+  const now = performance.now();
+  if (live.simTime >= live.cfg.simHours) { endLive(); return; }
+  try {
+    if (live.lastFrame === null) {
+      live.lastFrame = now;
+      lastRenderReal = now;
+      stuckSimTime = live.simTime; stuckSince = now;
+    }
+    const dtReal = Math.max(0, Math.min(0.2, (now - live.lastFrame) / 1000));
+    live.lastFrame = now;
+    const dtSim = dtReal * live.speed;
+    processEventsUpTo(live.simTime + dtSim, FRAME_EVENT_BUDGET);
+
+    // stuck-detection: if simTime hasn't advanced in 5 sec wall clock,
+    // bail out cleanly instead of leaving the user staring at a frozen page
+    if (live.simTime !== stuckSimTime) {
+      stuckSimTime = live.simTime; stuckSince = now;
+    } else if (now - stuckSince > 5000) {
+      console.warn('Sim stuck for >5s; ending live run.');
+      endLive(); renderHUD(); renderQueue();
+      return;
+    }
+
+    if (now - lastRenderReal >= 100) {
+      lastRenderReal = now;
+      renderHUD();
+      renderQueue();
+    }
+  } catch (err) {
+    console.error('Sim tick failed; ending live run.', err);
+    endLive();
+    return;
+  }
+  if (live.simTime >= live.cfg.simHours) { endLive(); renderHUD(); renderQueue(); return; }
+  // setTimeout instead of RAF — RAF gets paused/throttled by mobile during scroll,
+  // touch interactions, and heavy GPU work. setTimeout keeps firing.
+  live.tickHandle = setTimeout(tick, TICK_INTERVAL_MS);
+}
+
+function togglePlay() {
+  const btn = document.getElementById('btn-play');
+  if (live.simTime >= live.cfg.simHours) {
+    initLive(); // restart on replay
+  }
+  if (!live.running) {
+    live.running = true;
+    live.lastFrame = null;
+    btn.textContent = '❚❚ Pause';
+    if (live.tickHandle) clearTimeout(live.tickHandle);
+    live.tickHandle = setTimeout(tick, 0);
+  } else {
+    live.running = false;
+    if (live.tickHandle) { clearTimeout(live.tickHandle); live.tickHandle = null; }
+    btn.textContent = '▶ Play';
+  }
+}
+
+function restartLive() {
+  live.running = false;
+  if (live.tickHandle) { clearTimeout(live.tickHandle); live.tickHandle = null; }
+  initLive();
+  document.getElementById('btn-play').textContent = '▶ Play';
+}
+
+function onSpeedChange() {
+  live.speed = +document.getElementById('speed-slider').value;
+  document.getElementById('speed-val').textContent = live.speed.toFixed(2);
+}
+
+function updateRepLabel() {
+  const total = live.cfg ? live.cfg.replicates : +document.getElementById('cfg-reps').value;
+  document.getElementById('rep-idx').textContent = (live.replicateIdx + 1);
+  document.getElementById('rep-total').textContent = total;
+}
+
+function changeRep(delta) {
+  const total = live.cfg ? live.cfg.replicates : +document.getElementById('cfg-reps').value;
+  live.replicateIdx = ((live.replicateIdx + delta) % total + total) % total;
+  // stop and re-init with new seed
+  live.running = false;
+  if (live.tickHandle) { clearTimeout(live.tickHandle); live.tickHandle = null; }
+  document.getElementById('btn-play').textContent = '▶ Play';
+  initLive();
+  // re-render charts so the new replicate is highlighted
+  if (lastResult) {
+    renderOccupancy(lastResult.cfg, lastResult.reps[live.replicateIdx] || lastResult.reps[0]);
+    renderBoardQueue(lastResult.cfg, lastResult.reps);
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// Run multiple replicates
+// ════════════════════════════════════════════════════════
+let lastResult = null;
+
+function readCfg() {
+  return {
+    beds:          +document.getElementById('cfg-beds').value,
+    ipBeds:        +document.getElementById('cfg-ip-beds').value,
+    admitRate:     +document.getElementById('cfg-admit').value / 100,
+    losDischarged: +document.getElementById('cfg-los-d').value,
+    ipLosDays:     +document.getElementById('cfg-ip-los').value,
+    losSigma:      +document.getElementById('cfg-los-sigma').value,
+    dcHour:        +document.getElementById('cfg-dc-hour').value,
+    dcSigma:       +document.getElementById('cfg-dc-sigma').value,
+    tat:           +document.getElementById('cfg-tat').value,
+    transferDelay: +document.getElementById('cfg-xfer').value,
+    lwbs:          +document.getElementById('cfg-lwbs').value,
+    arrivalRate:   +document.getElementById('cfg-arr').value,
+    simHours:      +document.getElementById('cfg-hours').value,
+    replicates:    Math.max(1, Math.min(500, +document.getElementById('cfg-reps').value)),
+    seed:          +document.getElementById('cfg-seed').value,
+    warmup:        48
+  };
+}
+
+function runSim() {
+  const cfg = readCfg();
+  const status = document.getElementById('status');
+  status.textContent = 'running ' + cfg.replicates + ' replicate(s)…';
+
+  // chunked execution so the main thread can repaint between reps
+  // (otherwise mobile browsers will mark the page unresponsive)
+  const reps = [];
+  let i = 0;
+  const t0 = performance.now();
+  function batch() {
+    const start = performance.now();
+    while (i < cfg.replicates && performance.now() - start < 40) {
+      reps.push(simulate(cfg, rng(cfg.seed + i * 1000003)));
+      i++;
+    }
+    if (i < cfg.replicates) {
+      status.textContent = `running… ${i}/${cfg.replicates}`;
+      setTimeout(batch, 0);
+    } else {
+      const ensemble = computeEnsemble(reps);
+      lastResult = { cfg, reps, ensemble };
+      // clamp live.replicateIdx so picker stays in range, then re-bind label
+      if (live.replicateIdx >= cfg.replicates) live.replicateIdx = cfg.replicates - 1;
+      updateRepLabel();
+      renderStats(cfg, reps);
+      renderOccupancy(cfg, reps[live.replicateIdx] || reps[0]);
+      renderBoardQueue(cfg, reps);
+      renderHistogram(cfg, reps);
+      status.textContent = `done — ${cfg.replicates} reps in ${(performance.now()-t0).toFixed(0)}ms`;
+    }
+  }
+  setTimeout(batch, 30);
+}
+
+function resetDefaults() {
+  document.getElementById('cfg-beds').value = 50;
+  document.getElementById('cfg-ip-beds').value = 120;
+  document.getElementById('cfg-admit').value = 12;
+  document.getElementById('cfg-los-d').value = 4;
+  document.getElementById('cfg-ip-los').value = 5;
+  document.getElementById('cfg-los-sigma').value = 0.6;
+  document.getElementById('cfg-dc-hour').value = 12;
+  document.getElementById('cfg-dc-sigma').value = 2.5;
+  document.getElementById('cfg-tat').value = 2;
+  document.getElementById('cfg-xfer').value = 1;
+  document.getElementById('cfg-lwbs').value = 4;
+  document.getElementById('cfg-arr').value = 7;
+  document.getElementById('cfg-hours').value = 168;
+  document.getElementById('cfg-reps').value = 30;
+  document.getElementById('cfg-seed').value = 42;
+  initLive();
+  runSim();
+}
+
+// ════════════════════════════════════════════════════════
+// Ensemble (per-time-step mean across replicates)
+// ════════════════════════════════════════════════════════
+function computeEnsemble(reps) {
+  if (!reps || !reps.length) return null;
+  const N = reps[0].samples.length;
+  const E = {
+    times:    reps[0].samples.map(s => s.t),
+    boardMean:new Array(N).fill(0),
+    queueMean:new Array(N).fill(0),
+    ipMean:   new Array(N).fill(0),
+    edMean:   new Array(N).fill(0)
+  };
+  for (const rep of reps) {
+    for (let i = 0; i < N; i++) {
+      const s = rep.samples[i];
+      E.boardMean[i] += s.boarding;
+      E.queueMean[i] += s.queue;
+      E.ipMean[i]    += s.ipOcc;
+      E.edMean[i]    += s.edOccupied;
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    E.boardMean[i] /= reps.length;
+    E.queueMean[i] /= reps.length;
+    E.ipMean[i]    /= reps.length;
+    E.edMean[i]    /= reps.length;
+  }
+  return E;
+}
+
+// look up ensemble mean at a given simTime (linear search; fine — N=672 default)
+function ensembleAt(t) {
+  if (!lastResult || !lastResult.ensemble) return null;
+  const E = lastResult.ensemble;
+  if (E.times.length === 0) return null;
+  const dt = E.times[1] - E.times[0]; // 0.25 hr
+  const i = Math.min(E.times.length - 1, Math.max(0, Math.floor(t / dt)));
+  return {
+    board: E.boardMean[i],
+    queue: E.queueMean[i],
+    ip:    E.ipMean[i],
+    ed:    E.edMean[i]
+  };
+}
+
+// ════════════════════════════════════════════════════════
+// Stats
+// ════════════════════════════════════════════════════════
+function renderStats(cfg, reps) {
+  const warmupIdx = Math.floor(cfg.warmup / 0.25);
+  const allEdOcc = [], allBoard = [], allQueue = [], allIp = [];
+  let maxBoardEver = 0, maxQueueEver = 0, maxIp = 0;
+  let totalArrivals = 0, totalLwbs = 0;
+  let sumAvgBoard = 0, sumMaxBoard = 0, repsWithBoard = 0;
+  let sumAvgWait = 0, sumMaxWait = 0;
+
+  for (const rep of reps) {
+    const post = rep.samples.slice(warmupIdx);
+    for (const s of post) {
+      allEdOcc.push(s.edOccupied);
+      allBoard.push(s.boarding);
+      allQueue.push(s.queue);
+      allIp.push(s.ipOcc);
+      if (s.boarding > maxBoardEver) maxBoardEver = s.boarding;
+      if (s.queue > maxQueueEver) maxQueueEver = s.queue;
+      if (s.ipOcc > maxIp) maxIp = s.ipOcc;
+    }
+    totalArrivals += rep.totalArrivals;
+    totalLwbs += rep.lwbs;
+    if (rep.boarderCount > 0) {
+      sumAvgBoard += rep.avgBoardHr;
+      sumMaxBoard += rep.maxBoardHr;
+      repsWithBoard++;
+    }
+    sumAvgWait += rep.avgWaitHr;
+    sumMaxWait += rep.maxWaitHr;
+  }
+  const mean = a => a.reduce((s,x)=>s+x,0) / a.length;
+  const avgEd = mean(allEdOcc), avgB = mean(allBoard), avgQ = mean(allQueue), avgIp = mean(allIp);
+  const edUtil = avgEd / cfg.beds, ipUtil = avgIp / cfg.ipBeds;
+  const meanBoardHr = repsWithBoard > 0 ? sumAvgBoard / repsWithBoard : 0;
+  const meanMaxBoard = repsWithBoard > 0 ? sumMaxBoard / repsWithBoard : 0;
+  const meanLwbs = totalLwbs / reps.length;
+  const avgArrivals = totalArrivals / reps.length;
+
+  const tiles = [
+    { lbl: 'ED Utilization', val: (edUtil*100).toFixed(1)+'%', sub: avgEd.toFixed(1)+' / '+cfg.beds, hl: true },
+    { lbl: 'IP Utilization', val: (ipUtil*100).toFixed(1)+'%', sub: avgIp.toFixed(1)+' / '+cfg.ipBeds, hl: true },
+    { lbl: 'Avg Boarders', val: avgB.toFixed(1), sub: 'in ED, mean' },
+    { lbl: 'Peak Boarders', val: maxBoardEver, sub: 'any replicate', warn: maxBoardEver > cfg.beds*0.5 },
+    { lbl: 'Avg Boarder Time', val: meanBoardHr.toFixed(1)+' hr', sub: 'admit → IP bed', warn: meanBoardHr > 6 },
+    { lbl: 'Peak Boarder Time', val: meanMaxBoard.toFixed(1)+' hr', sub: 'mean of replicate max' },
+    { lbl: 'Avg Queue', val: avgQ.toFixed(2), sub: 'waiting room' },
+    { lbl: 'Peak Queue', val: maxQueueEver, sub: 'any replicate', warn: maxQueueEver > 5 },
+    { lbl: 'LWBS / week', val: meanLwbs.toFixed(1), sub: '> '+cfg.lwbs+' hr wait', warn: meanLwbs > 5 },
+    { lbl: 'Mean Wait', val: (sumAvgWait/reps.length).toFixed(2)+' hr', sub: 'for queued pts' },
+    { lbl: 'Arrivals / Rep', val: avgArrivals.toFixed(0), sub: cfg.simHours+' hr' },
+    { lbl: 'IP Peak', val: maxIp, sub: 'max occupied' }
+  ];
+  const el = document.getElementById('stats-tiles');
+  el.innerHTML = tiles.map(t =>
+    `<div class="tile ${t.hl?'hl':''} ${t.warn?'warn':''}">
+       <div class="tile-lbl">${t.lbl}</div>
+       <div class="tile-val">${t.val}</div>
+       <div class="tile-sub">${t.sub}</div>
+     </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// Canvas helpers
+// ════════════════════════════════════════════════════════
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  // Cache the original CSS-intended height on first setup. Subsequent calls
+  // mutate canvas.height (which reflects to the HTML attribute), so reading
+  // getAttribute('height') a second time would feed back the dpr-scaled value
+  // and the canvas would grow exponentially on each call.
+  if (!canvas.dataset.cssH) canvas.dataset.cssH = canvas.getAttribute('height');
+  const cssH = +canvas.dataset.cssH;
+  // Same hazard for width if we ever set width attribute via JS — guard the same way
+  if (!canvas.dataset.cssW) canvas.dataset.cssW = canvas.clientWidth || canvas.getAttribute('width');
+  const cssW = canvas.clientWidth || +canvas.dataset.cssW;
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.height = cssH + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
+  return { ctx, w: cssW, h: cssH };
+}
+
+function drawAxes(ctx, x0, y0, x1, y1, xMax, yMax, xLabel, yLabel, xTicks, yTicks) {
+  ctx.strokeStyle = '#2e3d55';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#6e8099';
+  ctx.font = '9px DM Mono, monospace';
+
+  // axes
+  ctx.beginPath();
+  ctx.moveTo(x0, y0); ctx.lineTo(x0, y1);
+  ctx.moveTo(x0, y1); ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  // y ticks
+  yTicks = yTicks || 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const yv = yMax * i / yTicks;
+    const py = y1 - (y1-y0) * i/yTicks;
+    ctx.strokeStyle = i===0 ? '#2e3d55' : 'rgba(46,61,85,0.4)';
+    ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(x1, py); ctx.stroke();
+    ctx.fillStyle = '#6e8099';
+    ctx.textAlign = 'right';
+    ctx.fillText(yv.toFixed(yv>=10?0:1), x0-5, py+3);
+  }
+  // x ticks
+  xTicks = xTicks || 7;
+  for (let i = 0; i <= xTicks; i++) {
+    const xv = xMax * i / xTicks;
+    const px = x0 + (x1-x0) * i/xTicks;
+    ctx.strokeStyle = '#2e3d55';
+    ctx.beginPath(); ctx.moveTo(px, y1); ctx.lineTo(px, y1+3); ctx.stroke();
+    ctx.fillStyle = '#6e8099';
+    ctx.textAlign = 'center';
+    ctx.fillText(xv.toFixed(0), px, y1+14);
+  }
+  // labels
+  ctx.fillStyle = '#6e8099';
+  ctx.textAlign = 'center';
+  ctx.fillText(xLabel, (x0+x1)/2, y1+28);
+  ctx.save();
+  ctx.translate(x0-32, (y0+y1)/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════════════════
+// Occupancy chart — sample replicate, stacked area
+// ════════════════════════════════════════════════════════
+function renderOccupancy(cfg, rep) {
+  const canvas = document.getElementById('occChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const padL = 50, padR = 18, padT = 12, padB = 36;
+  const x0 = padL, x1 = w - padR, y0 = padT, y1 = h - padB;
+  const xMax = cfg.simHours;
+  const yMax = Math.max(cfg.beds + Math.ceil(cfg.beds*0.1), Math.max(...rep.samples.map(s=>s.edOccupied+s.queue))+2);
+
+  drawAxes(ctx, x0, y0, x1, y1, xMax, yMax, 'Time (hours)', 'Patients', 7, 6);
+
+  const xs = t => x0 + (x1-x0) * (t / xMax);
+  const ys = v => y1 - (y1-y0) * (v / yMax);
+
+  // Stacked area: workup (blue) bottom, boarders (red) top
+  ctx.beginPath();
+  ctx.moveTo(xs(0), ys(0));
+  for (const s of rep.samples) ctx.lineTo(xs(s.t), ys(s.workup));
+  ctx.lineTo(xs(rep.samples[rep.samples.length-1].t), ys(0));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(77,157,224,0.55)';
+  ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i < rep.samples.length; i++) {
+    const s = rep.samples[i];
+    const fn = i===0 ? 'moveTo' : 'lineTo';
+    ctx[fn](xs(s.t), ys(s.workup));
+  }
+  for (let i = rep.samples.length-1; i >= 0; i--) {
+    const s = rep.samples[i];
+    ctx.lineTo(xs(s.t), ys(s.edOccupied));
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(224,90,90,0.65)';
+  ctx.fill();
+
+  // Queue overflow above capacity — show as faint yellow bars above the line
+  ctx.fillStyle = 'rgba(212,169,74,0.8)';
+  for (let i = 0; i < rep.samples.length; i++) {
+    const s = rep.samples[i];
+    if (s.queue > 0) {
+      const x = xs(s.t);
+      const yTop = ys(s.edOccupied + s.queue);
+      const yBot = ys(s.edOccupied);
+      ctx.fillRect(x-1, yTop, 2, yBot - yTop);
+    }
+  }
+
+  // Capacity line
+  ctx.strokeStyle = '#c9943a';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(x0, ys(cfg.beds));
+  ctx.lineTo(x1, ys(cfg.beds));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#c9943a';
+  ctx.textAlign = 'left';
+  ctx.font = '9px DM Mono, monospace';
+  ctx.fillText('capacity = ' + cfg.beds, x0+6, ys(cfg.beds)-4);
+}
+
+// ════════════════════════════════════════════════════════
+// Boarders + queue ensemble chart
+// ════════════════════════════════════════════════════════
+function renderBoardQueue(cfg, reps) {
+  const canvas = document.getElementById('boardChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const padL = 50, padR = 18, padT = 12, padB = 36;
+  const x0 = padL, x1 = w - padR, y0 = padT, y1 = h - padB;
+
+  const N = reps[0].samples.length;
+  const boardMean = new Array(N), boardP5 = new Array(N), boardP95 = new Array(N);
+  const queueMean = new Array(N), queueP5 = new Array(N), queueP95 = new Array(N);
+
+  for (let i = 0; i < N; i++) {
+    const bs = reps.map(r => r.samples[i].boarding).sort((a,b)=>a-b);
+    const qs = reps.map(r => r.samples[i].queue).sort((a,b)=>a-b);
+    const sum = a => a.reduce((s,x)=>s+x,0);
+    boardMean[i] = sum(bs)/bs.length;
+    queueMean[i] = sum(qs)/qs.length;
+    const lo = Math.floor(0.05 * (bs.length-1));
+    const hi = Math.ceil(0.95 * (bs.length-1));
+    boardP5[i] = bs[lo]; boardP95[i] = bs[hi];
+    queueP5[i] = qs[lo]; queueP95[i] = qs[hi];
+  }
+
+  const xMax = cfg.simHours;
+  const allMax = Math.max(
+    Math.max(...boardP95),
+    Math.max(...queueP95),
+    cfg.beds * 0.3
+  );
+  const yMax = Math.ceil(allMax + 1);
+
+  drawAxes(ctx, x0, y0, x1, y1, xMax, yMax, 'Time (hours)', 'Patients', 7, 5);
+
+  const xs = i => x0 + (x1-x0) * (reps[0].samples[i].t / xMax);
+  const ys = v => y1 - (y1-y0) * (v / yMax);
+
+  // queue band
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const fn = i===0 ? 'moveTo' : 'lineTo';
+    ctx[fn](xs(i), ys(queueP95[i]));
+  }
+  for (let i = N-1; i >= 0; i--) ctx.lineTo(xs(i), ys(queueP5[i]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(212,169,74,0.18)';
+  ctx.fill();
+
+  // boarder band
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const fn = i===0 ? 'moveTo' : 'lineTo';
+    ctx[fn](xs(i), ys(boardP95[i]));
+  }
+  for (let i = N-1; i >= 0; i--) ctx.lineTo(xs(i), ys(boardP5[i]));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(224,90,90,0.18)';
+  ctx.fill();
+
+  // mean lines
+  function drawLine(arr, color, lw) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const fn = i===0 ? 'moveTo' : 'lineTo';
+      ctx[fn](xs(i), ys(arr[i]));
+    }
+    ctx.stroke();
+  }
+  drawLine(boardMean, '#e05a5a', 1.6);
+  drawLine(queueMean, '#d4a94a', 1.6);
+
+  // overlay the currently-selected replicate's trajectory in bold gold
+  const selRep = reps[live.replicateIdx] || reps[0];
+  if (selRep) {
+    ctx.strokeStyle = '#c9943a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const fn = i===0 ? 'moveTo' : 'lineTo';
+      ctx[fn](xs(i), ys(selRep.samples[i].boarding));
+    }
+    ctx.stroke();
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const fn = i===0 ? 'moveTo' : 'lineTo';
+      ctx[fn](xs(i), ys(selRep.samples[i].queue));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // chart annotation: which replicate is bold
+  ctx.fillStyle = '#c9943a';
+  ctx.font = '10px DM Mono, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`Rep ${live.replicateIdx+1} = bold gold (live)`, x1-6, y0+12);
+
+  // warmup shading
+  const warmupX = x0 + (x1-x0) * (cfg.warmup / cfg.simHours);
+  ctx.fillStyle = 'rgba(110,128,153,0.08)';
+  ctx.fillRect(x0, y0, warmupX-x0, y1-y0);
+  ctx.fillStyle = '#6e8099';
+  ctx.font = '9px DM Mono, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('warmup', x0+4, y0+12);
+}
+
+// ════════════════════════════════════════════════════════
+// Histogram of peak boarders / queue per replicate
+// ════════════════════════════════════════════════════════
+function renderHistogram(cfg, reps) {
+  const canvas = document.getElementById('histChart');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const padL = 50, padR = 18, padT = 12, padB = 36;
+  const x0 = padL, x1 = w - padR, y0 = padT, y1 = h - padB;
+
+  const warmupIdx = Math.floor(cfg.warmup / 0.25);
+  const peakBoarders = reps.map(r => Math.max(...r.samples.slice(warmupIdx).map(s=>s.boarding)));
+  const peakQueue    = reps.map(r => Math.max(...r.samples.slice(warmupIdx).map(s=>s.queue)));
+
+  const allMax = Math.max(Math.max(...peakBoarders), Math.max(...peakQueue), 5);
+  const nBins = Math.min(20, Math.max(6, Math.ceil(allMax)));
+  const binW = allMax / nBins;
+  const boardBins = new Array(nBins).fill(0);
+  const queueBins = new Array(nBins).fill(0);
+  for (const v of peakBoarders) {
+    const b = Math.min(nBins-1, Math.floor(v / binW));
+    boardBins[b]++;
+  }
+  for (const v of peakQueue) {
+    const b = Math.min(nBins-1, Math.floor(v / binW));
+    queueBins[b]++;
+  }
+  const yMax = Math.max(...boardBins, ...queueBins) || 1;
+
+  drawAxes(ctx, x0, y0, x1, y1, allMax, yMax, 'Peak count (boarders / queue)', 'Replicate count', 8, 5);
+
+  const xs = v => x0 + (x1-x0) * (v / allMax);
+  const ys = v => y1 - (y1-y0) * (v / yMax);
+  const colW = (x1-x0) / nBins;
+
+  for (let i = 0; i < nBins; i++) {
+    const bx = xs(i*binW);
+    const halfW = colW * 0.42;
+    // boarders bar (left half)
+    ctx.fillStyle = '#e05a5a';
+    ctx.fillRect(bx + colW*0.04, ys(boardBins[i]), halfW, y1 - ys(boardBins[i]));
+    // queue bar (right half)
+    ctx.fillStyle = '#d4a94a';
+    ctx.fillRect(bx + colW*0.04 + halfW + 1, ys(queueBins[i]), halfW, y1 - ys(queueBins[i]));
+  }
+
+  // means
+  const mean = a => a.reduce((s,x)=>s+x,0) / a.length;
+  const mB = mean(peakBoarders), mQ = mean(peakQueue);
+  ctx.strokeStyle = '#e05a5a'; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xs(mB), y0); ctx.lineTo(xs(mB), y1); ctx.stroke();
+  ctx.strokeStyle = '#d4a94a';
+  ctx.beginPath(); ctx.moveTo(xs(mQ), y0); ctx.lineTo(xs(mQ), y1); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#e05a5a'; ctx.font = '9px DM Mono, monospace'; ctx.textAlign = 'left';
+  ctx.fillText('μ='+mB.toFixed(1), xs(mB)+4, y0+10);
+  ctx.fillStyle = '#d4a94a';
+  ctx.fillText('μ='+mQ.toFixed(1), xs(mQ)+4, y0+22);
+}
+
+// On page load: build the live grid only. Monte Carlo runs on demand
+// (it blocks the main thread for hundreds of ms — bad on mobile).
+window.addEventListener('load', () => {
+  initLive();
+});
+window.addEventListener('resize', () => {
+  if (lastResult) {
+    renderOccupancy(lastResult.cfg, lastResult.reps[0]);
+    renderBoardQueue(lastResult.cfg, lastResult.reps);
+    renderHistogram(lastResult.cfg, lastResult.reps);
+  }
+});
+
+// Re-init the live grid when params change (debounced)
+let cfgChangeTimer = null;
+['cfg-beds','cfg-ip-beds','cfg-admit','cfg-los-d','cfg-ip-los','cfg-los-sigma',
+ 'cfg-dc-hour','cfg-dc-sigma','cfg-tat','cfg-xfer','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    clearTimeout(cfgChangeTimer);
+    cfgChangeTimer = setTimeout(() => {
+      live.running = false;
+      document.getElementById('btn-play').textContent = '▶ Play';
+      initLive();
+    }, 150);
+  });
+});
+
+// Set initial speed display
+document.getElementById('speed-val').textContent = '0.50';
+// Init rep label
+updateRepLabel();
+</script>
+</body>
+</html>
