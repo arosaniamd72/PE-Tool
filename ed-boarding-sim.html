@@ -180,9 +180,153 @@ canvas { display: block; width: 100%; height: auto; }
 }
 .disclaimer strong { color: var(--red); }
 
+/* ─── LIVE ANIMATION ─── */
+.live-hud {
+  display: flex;
+  gap: 22px;
+  padding: 14px 18px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hud-item { display: flex; flex-direction: column; gap: 2px; min-width: 60px; }
+.hud-lbl { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.hud-val {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+  font-style: italic;
+  line-height: 1;
+  color: var(--text);
+}
+
+.live-controls {
+  display: flex; gap: 14px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.btn.small { padding: 8px 14px; font-size: 11px; }
+.speed-ctrl {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 10px; color: var(--muted);
+  margin-left: auto;
+}
+.speed-ctrl input[type="range"] {
+  width: 160px; accent-color: var(--gold);
+  background: var(--border); height: 4px; border-radius: 2px; outline: none;
+}
+#speed-val { color: var(--gold); min-width: 30px; display: inline-block; text-align: right; }
+
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 7px;
+  padding: 16px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.bed {
+  position: relative;
+  aspect-ratio: 1.3 / 1;
+  border-radius: 6px;
+  border: 1px solid var(--faint);
+  background: rgba(255,255,255,0.015);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+  color: var(--faint);
+}
+.bed-num {
+  position: absolute; top: 3px; left: 5px;
+  font-size: 8px; color: var(--faint);
+  letter-spacing: 0.05em;
+}
+.bed svg.bed-icon { width: 78%; height: 70%; display: block; }
+.bed .patient { opacity: 0; transition: opacity 0.4s ease; }
+.bed.occupied .patient { opacity: 1; }
+
+.bed.workup {
+  background: rgba(77,157,224,0.13);
+  border-color: rgba(77,157,224,0.55);
+  box-shadow: 0 0 10px rgba(77,157,224,0.18) inset;
+  color: #4d9de0;
+}
+.bed.boarder {
+  background: rgba(224,90,90,0.18);
+  border-color: rgba(224,90,90,0.65);
+  box-shadow: 0 0 14px rgba(224,90,90,0.25) inset;
+  color: #e05a5a;
+  animation: bedPulse 2.4s ease-in-out infinite;
+}
+@keyframes bedPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(224,90,90,0.20) inset; }
+  50%      { box-shadow: 0 0 18px rgba(224,90,90,0.45) inset, 0 0 8px rgba(224,90,90,0.3); }
+}
+.bed-time {
+  position: absolute; bottom: 3px; right: 5px;
+  font-size: 8px;
+  font-family: 'DM Mono', monospace;
+  color: inherit; opacity: 0;
+  transition: opacity 0.3s;
+}
+.bed.occupied .bed-time { opacity: 0.85; }
+
+.bed.flash-arrive {
+  animation: flashArrive 0.6s ease;
+}
+@keyframes flashArrive {
+  0%   { background: rgba(255,255,255,0.25); }
+  100% { background: rgba(77,157,224,0.13); }
+}
+
+.queue-display {
+  padding: 12px 16px;
+  background: var(--s2);
+  border: 1px dashed rgba(212,169,74,0.4);
+  border-radius: 8px;
+  display: flex; gap: 14px; align-items: center;
+  min-height: 50px;
+}
+.queue-lbl {
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); flex-shrink: 0;
+}
+.queue-icons {
+  display: flex; gap: 5px; flex-wrap: wrap; flex: 1;
+  align-items: center; min-height: 22px;
+}
+.q-pt {
+  width: 12px; height: 18px;
+  background: var(--yellow);
+  border-radius: 2px 2px 4px 4px;
+  opacity: 0.85;
+  animation: qAppear 0.35s ease;
+  position: relative;
+}
+.q-pt::before {
+  content: ''; position: absolute;
+  top: -5px; left: 2px;
+  width: 8px; height: 6px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+@keyframes qAppear {
+  from { opacity: 0; transform: translateY(-6px) scale(0.6); }
+  to   { opacity: 0.85; transform: none; }
+}
+.queue-empty {
+  font-size: 10px; color: var(--faint); font-style: italic;
+}
+
+@media(max-width:720px) {
+  .bed-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 @media(max-width:560px){
   .wrap { padding: 16px; }
   .masthead{padding:24px 16px 20px;}
+  .speed-ctrl { margin-left: 0; width: 100%; }
 }
 </style>
 </head>
@@ -247,9 +391,46 @@ canvas { display: block; width: 100%; height: auto; }
       </div>
     </div>
     <div class="btn-row">
-      <button class="btn" onclick="runSim()">▶ Run Simulation</button>
+      <button class="btn" onclick="runSim()">▶ Run Monte Carlo (all replicates)</button>
       <button class="btn secondary" onclick="resetDefaults()">Reset Defaults</button>
       <span id="status" style="font-size:10px;color:var(--muted);align-self:center;margin-left:8px;"></span>
+    </div>
+  </div>
+
+  <!-- ─── LIVE ED FLOOR ─── -->
+  <div class="card">
+    <div class="card-hd">Live ED Floor <span style="font-size:9px;color:var(--muted);letter-spacing:0;text-transform:none;">— watch beds fill, patients work up, admits become boarders</span></div>
+
+    <div class="live-hud">
+      <div class="hud-item"><span class="hud-lbl">Sim Time</span><span class="hud-val" id="hud-time">0.0 hr</span></div>
+      <div class="hud-item"><span class="hud-lbl">Day</span><span class="hud-val" id="hud-day">1</span></div>
+      <div class="hud-item"><span class="hud-lbl">Occupied</span><span class="hud-val" id="hud-occ">0 / 50</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#4d9de0;">Workup</span><span class="hud-val" id="hud-workup" style="color:#4d9de0;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#e05a5a;">Boarding</span><span class="hud-val" id="hud-board" style="color:#e05a5a;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl" style="color:#d4a94a;">Waiting</span><span class="hud-val" id="hud-queue" style="color:#d4a94a;">0</span></div>
+      <div class="hud-item"><span class="hud-lbl">Total Seen</span><span class="hud-val" id="hud-seen">0</span></div>
+    </div>
+
+    <div class="live-controls">
+      <button class="btn small" id="btn-play" onclick="togglePlay()">▶ Play</button>
+      <button class="btn small secondary" onclick="restartLive()">↻ Restart</button>
+      <label class="speed-ctrl">
+        <span><span id="speed-val">0.50</span> sim hr / sec</span>
+        <input type="range" id="speed-slider" min="0.1" max="20" step="0.1" value="0.5" oninput="onSpeedChange()">
+      </label>
+    </div>
+
+    <div class="bed-grid" id="bed-grid"></div>
+
+    <div class="queue-display">
+      <div class="queue-lbl">Waiting Room</div>
+      <div class="queue-icons" id="queue-icons"><span class="queue-empty">no patients waiting</span></div>
+    </div>
+
+    <div class="legend" style="margin-top:12px;">
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(77,157,224,0.5);border:1px solid rgba(77,157,224,0.7);"></span>Workup (blue) — discharge-track or pre-admit decision</div>
+      <div class="legend-item"><span class="legend-sw" style="background:rgba(224,90,90,0.6);border:1px solid rgba(224,90,90,0.7);"></span>Boarding (red) — admitted, awaiting inpatient bed</div>
+      <div class="legend-item"><span class="legend-sw" style="background:var(--yellow);"></span>Waiting room — beds full</div>
     </div>
   </div>
 
@@ -435,6 +616,243 @@ function simulate(cfg, r) {
     maxQueueLen,
     avgLOS: departed > 0 ? totalLOS / departed : 0
   };
+}
+
+// ════════════════════════════════════════════════════════
+// LIVE ANIMATED SIMULATION
+// ════════════════════════════════════════════════════════
+const live = {
+  cfg: null,
+  rng: null,
+  beds: [],            // [{id, state, patient, arriveTime, decisionTime, leaveTime}]
+  queue: [],           // [{arriveTime, willAdmit}]
+  arrivals: [],        // pre-generated schedule
+  arrivalIdx: 0,
+  simTime: 0,
+  running: false,
+  speed: 0.5,          // sim hr / real sec
+  lastFrame: null,
+  totalSeen: 0
+};
+
+function bedSVG() {
+  // simple top-down hospital bed icon, uses currentColor
+  return `<svg class="bed-icon" viewBox="0 0 60 40" preserveAspectRatio="xMidYMid meet">
+    <rect x="3" y="14" width="54" height="22" rx="3"
+          fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.7"/>
+    <rect x="6" y="17" width="13" height="9" rx="1.5"
+          fill="currentColor" opacity="0.35"/>
+    <g class="patient">
+      <circle cx="13" cy="22" r="3.2" fill="currentColor" opacity="0.95"/>
+      <rect x="18" y="19" width="34" height="7" rx="2.5" fill="currentColor" opacity="0.85"/>
+    </g>
+  </svg>`;
+}
+
+function buildBedGrid() {
+  const cfg = readCfg();
+  live.cfg = cfg;
+  const grid = document.getElementById('bed-grid');
+  grid.innerHTML = '';
+  // adjust grid columns based on bed count
+  const cols = Math.min(10, Math.ceil(Math.sqrt(cfg.beds * 1.6)));
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  live.beds = [];
+  for (let i = 0; i < cfg.beds; i++) {
+    const div = document.createElement('div');
+    div.className = 'bed';
+    div.id = 'bed-' + i;
+    div.innerHTML = `<span class="bed-num">${String(i+1).padStart(2,'0')}</span>${bedSVG()}<span class="bed-time"></span>`;
+    grid.appendChild(div);
+    live.beds.push({
+      id: i,
+      state: 'empty',  // 'empty' | 'workup' | 'boarder'
+      patient: null,
+      el: div,
+      timeEl: div.querySelector('.bed-time')
+    });
+  }
+}
+
+function initLive() {
+  buildBedGrid();
+  const cfg = live.cfg;
+  live.rng = rng((cfg.seed + 7777) >>> 0);
+  // pre-generate arrivals
+  live.arrivals = [];
+  let t = 0;
+  while (true) {
+    t += expRand(live.rng, 1 / cfg.arrivalRate);
+    if (t >= cfg.simHours) break;
+    live.arrivals.push({ time: t, willAdmit: live.rng() < cfg.admitRate });
+  }
+  live.arrivalIdx = 0;
+  live.queue = [];
+  live.simTime = 0;
+  live.totalSeen = 0;
+  live.lastFrame = null;
+  renderHUD();
+  renderQueue();
+}
+
+function placeInBed(bed, patient, t) {
+  bed.state = 'workup';
+  bed.patient = patient;
+  patient.bedTime = t;
+  // workup duration = LOS for discharge (with exponential variability)
+  const workupDur = expRand(live.rng, live.cfg.losDischarged);
+  patient.workupEndTime = t + workupDur;
+  if (patient.willAdmit) {
+    const extra = Math.max(0.1, live.cfg.losAdmitted - live.cfg.losDischarged);
+    const boardDur = expRand(live.rng, extra);
+    patient.leaveTime = patient.workupEndTime + boardDur;
+  } else {
+    patient.leaveTime = patient.workupEndTime;
+  }
+  bed.el.classList.add('occupied', 'workup', 'flash-arrive');
+  setTimeout(() => bed.el.classList.remove('flash-arrive'), 600);
+}
+
+function transitionToBoarder(bed) {
+  bed.state = 'boarder';
+  bed.el.classList.remove('workup');
+  bed.el.classList.add('boarder');
+}
+
+function dischargeBed(bed, t) {
+  bed.state = 'empty';
+  bed.patient = null;
+  bed.el.classList.remove('occupied', 'workup', 'boarder');
+  bed.timeEl.textContent = '';
+  // pull next from queue
+  if (live.queue.length > 0) {
+    const next = live.queue.shift();
+    placeInBed(bed, next, t);
+  }
+}
+
+function processEventsUpTo(targetT) {
+  // Loop: find earliest pending event ≤ targetT; process; repeat.
+  while (true) {
+    let nextT = Infinity, nextKind = null, nextRef = null;
+
+    // next arrival
+    if (live.arrivalIdx < live.arrivals.length) {
+      const a = live.arrivals[live.arrivalIdx];
+      if (a.time < nextT) { nextT = a.time; nextKind = 'arrival'; nextRef = a; }
+    }
+    // next bed event (workup-end transition or leave)
+    for (const bed of live.beds) {
+      if (bed.state === 'workup') {
+        const t = bed.patient.workupEndTime;
+        if (t < nextT) { nextT = t; nextKind = 'workup-end'; nextRef = bed; }
+      } else if (bed.state === 'boarder') {
+        const t = bed.patient.leaveTime;
+        if (t < nextT) { nextT = t; nextKind = 'leave'; nextRef = bed; }
+      }
+    }
+
+    if (nextT > targetT || nextT === Infinity) break;
+
+    if (nextKind === 'arrival') {
+      const a = nextRef;
+      live.arrivalIdx++;
+      live.totalSeen++;
+      const pt = { willAdmit: a.willAdmit, arriveTime: a.time };
+      const free = live.beds.find(b => b.state === 'empty');
+      if (free) placeInBed(free, pt, a.time);
+      else live.queue.push(pt);
+    } else if (nextKind === 'workup-end') {
+      const bed = nextRef;
+      if (bed.patient.willAdmit) transitionToBoarder(bed);
+      else dischargeBed(bed, nextT);
+    } else if (nextKind === 'leave') {
+      dischargeBed(nextRef, nextT);
+    }
+  }
+  live.simTime = Math.min(targetT, live.cfg.simHours);
+}
+
+function renderHUD() {
+  let occ = 0, workup = 0, board = 0;
+  for (const bed of live.beds) {
+    if (bed.state !== 'empty') {
+      occ++;
+      if (bed.state === 'workup') workup++;
+      else if (bed.state === 'boarder') board++;
+    }
+    if (bed.state !== 'empty' && bed.patient) {
+      const elapsed = live.simTime - bed.patient.bedTime;
+      bed.timeEl.textContent = elapsed.toFixed(1) + 'h';
+    }
+  }
+  document.getElementById('hud-time').textContent = live.simTime.toFixed(1) + ' hr';
+  document.getElementById('hud-day').textContent = Math.floor(live.simTime / 24) + 1;
+  document.getElementById('hud-occ').textContent = occ + ' / ' + live.cfg.beds;
+  document.getElementById('hud-workup').textContent = workup;
+  document.getElementById('hud-board').textContent = board;
+  document.getElementById('hud-queue').textContent = live.queue.length;
+  document.getElementById('hud-seen').textContent = live.totalSeen;
+}
+
+function renderQueue() {
+  const el = document.getElementById('queue-icons');
+  if (live.queue.length === 0) {
+    el.innerHTML = '<span class="queue-empty">no patients waiting</span>';
+    return;
+  }
+  // cap rendering at 30 icons; show "+N" overflow
+  const N = live.queue.length;
+  const show = Math.min(N, 30);
+  let html = '';
+  for (let i = 0; i < show; i++) html += '<div class="q-pt"></div>';
+  if (N > show) html += `<span style="font-size:10px;color:var(--yellow);margin-left:6px;">+${N-show}</span>`;
+  el.innerHTML = html;
+}
+
+function tick(now) {
+  if (!live.running) return;
+  if (live.lastFrame === null) live.lastFrame = now;
+  const dtReal = Math.min(0.1, (now - live.lastFrame) / 1000); // clamp big jumps
+  live.lastFrame = now;
+  const dtSim = dtReal * live.speed;
+  processEventsUpTo(live.simTime + dtSim);
+  renderHUD();
+  renderQueue();
+  if (live.simTime >= live.cfg.simHours) {
+    live.running = false;
+    document.getElementById('btn-play').textContent = '▶ Replay';
+    return;
+  }
+  requestAnimationFrame(tick);
+}
+
+function togglePlay() {
+  const btn = document.getElementById('btn-play');
+  if (live.simTime >= live.cfg.simHours) {
+    // restart on replay
+    initLive();
+  }
+  if (!live.running) {
+    live.running = true;
+    live.lastFrame = null;
+    btn.textContent = '❚❚ Pause';
+    requestAnimationFrame(tick);
+  } else {
+    live.running = false;
+    btn.textContent = '▶ Play';
+  }
+}
+
+function restartLive() {
+  live.running = false;
+  initLive();
+  document.getElementById('btn-play').textContent = '▶ Play';
+}
+
+function onSpeedChange() {
+  live.speed = +document.getElementById('speed-slider').value;
+  document.getElementById('speed-val').textContent = live.speed.toFixed(2);
 }
 
 // ════════════════════════════════════════════════════════
@@ -820,7 +1238,10 @@ function renderHistogram(cfg, reps) {
 }
 
 // auto-run on load
-window.addEventListener('load', runSim);
+window.addEventListener('load', () => {
+  initLive();
+  runSim();
+});
 window.addEventListener('resize', () => {
   if (lastResult) {
     renderOccupancy(lastResult.cfg, lastResult.reps[0]);
@@ -828,6 +1249,18 @@ window.addEventListener('resize', () => {
     renderHistogram(lastResult.cfg, lastResult.reps);
   }
 });
+
+// Re-init the live grid when bed count / params change
+['cfg-beds','cfg-admit','cfg-los-d','cfg-los-a','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    live.running = false;
+    document.getElementById('btn-play').textContent = '▶ Play';
+    initLive();
+  });
+});
+
+// Set initial speed display
+document.getElementById('speed-val').textContent = '0.50';
 </script>
 </body>
 </html>
