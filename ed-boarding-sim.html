@@ -863,37 +863,55 @@ function bedSVG() {
 function buildBedGrid() {
   const cfg = readCfg();
   live.cfg = cfg;
-  // ED grid
+  // ED grid — reuse existing elements if count matches (avoids 170-elem
+  // teardown+rebuild on every Replay, which can OOM-kill mobile tabs)
   const edGrid = document.getElementById('bed-grid');
   edGrid.classList.remove('sim-ended');
-  edGrid.innerHTML = '';
-  const edCols = Math.min(10, Math.ceil(Math.sqrt(cfg.beds * 1.6)));
-  edGrid.style.gridTemplateColumns = `repeat(${edCols}, minmax(0, 1fr))`;
-  live.edBeds = [];
-  for (let i = 0; i < cfg.beds; i++) {
-    const div = document.createElement('div');
-    div.className = 'bed';
-    div.id = 'bed-' + i;
-    div.innerHTML = `<span class="bed-num">${String(i+1).padStart(2,'0')}</span>${bedSVG()}<span class="bed-time"></span>`;
-    edGrid.appendChild(div);
-    live.edBeds.push({
-      id: i, state: 'empty', pt: null,
-      el: div, timeEl: div.querySelector('.bed-time')
-    });
+  if (live.edBeds.length === cfg.beds && live.edBeds.length > 0) {
+    for (const bed of live.edBeds) {
+      bed.state = 'empty';
+      bed.pt = null;
+      bed.el.className = 'bed';
+      bed.timeEl.textContent = '';
+    }
+  } else {
+    edGrid.innerHTML = '';
+    const edCols = Math.min(10, Math.ceil(Math.sqrt(cfg.beds * 1.6)));
+    edGrid.style.gridTemplateColumns = `repeat(${edCols}, minmax(0, 1fr))`;
+    live.edBeds = [];
+    for (let i = 0; i < cfg.beds; i++) {
+      const div = document.createElement('div');
+      div.className = 'bed';
+      div.id = 'bed-' + i;
+      div.innerHTML = `<span class="bed-num">${String(i+1).padStart(2,'0')}</span>${bedSVG()}<span class="bed-time"></span>`;
+      edGrid.appendChild(div);
+      live.edBeds.push({
+        id: i, state: 'empty', pt: null,
+        el: div, timeEl: div.querySelector('.bed-time')
+      });
+    }
   }
-  // IP grid
+  // IP grid — same reuse strategy
   const ipGrid = document.getElementById('ip-grid');
   ipGrid.classList.remove('sim-ended');
-  ipGrid.innerHTML = '';
-  const ipCols = Math.min(20, Math.ceil(Math.sqrt(cfg.ipBeds * 1.8)));
-  ipGrid.style.gridTemplateColumns = `repeat(${ipCols}, minmax(0, 1fr))`;
-  live.ipBeds = [];
-  for (let i = 0; i < cfg.ipBeds; i++) {
-    const div = document.createElement('div');
-    div.className = 'ip-bed';
-    div.title = 'IP bed ' + (i+1);
-    ipGrid.appendChild(div);
-    live.ipBeds.push({ id: i, state: 'empty', pt: null, el: div });
+  if (live.ipBeds.length === cfg.ipBeds && live.ipBeds.length > 0) {
+    for (const bed of live.ipBeds) {
+      bed.state = 'empty';
+      bed.pt = null;
+      bed.el.className = 'ip-bed';
+    }
+  } else {
+    ipGrid.innerHTML = '';
+    const ipCols = Math.min(20, Math.ceil(Math.sqrt(cfg.ipBeds * 1.8)));
+    ipGrid.style.gridTemplateColumns = `repeat(${ipCols}, minmax(0, 1fr))`;
+    live.ipBeds = [];
+    for (let i = 0; i < cfg.ipBeds; i++) {
+      const div = document.createElement('div');
+      div.className = 'ip-bed';
+      div.title = 'IP bed ' + (i+1);
+      ipGrid.appendChild(div);
+      live.ipBeds.push({ id: i, state: 'empty', pt: null, el: div });
+    }
   }
   // DC hour label
   const dh = cfg.dcHour;
@@ -1022,12 +1040,11 @@ function processEventsUpTo(targetT) {
       }
     }
     // also process LWBS if next waiting patient would expire before nextT
-    let nextLWBS = Infinity;
-    for (const w of live.waitingRoom) {
-      const exp = w.arriveTime + live.cfg.lwbs;
-      if (exp < nextLWBS) nextLWBS = exp;
+    // WR is strict FIFO by arrival time, so the head has the earliest LWBS exp
+    if (live.waitingRoom.length > 0) {
+      const exp = live.waitingRoom[0].arriveTime + live.cfg.lwbs;
+      if (exp < nextT) { nextT = exp; nextKind = 'lwbs'; nextRef = null; }
     }
-    if (nextLWBS < nextT) { nextT = nextLWBS; nextKind = 'lwbs'; nextRef = null; }
 
     if (nextT > targetT || nextT === Infinity) break;
 
@@ -1132,16 +1149,18 @@ function renderHUD() {
 function renderQueue() {
   const el = document.getElementById('queue-icons');
   const N = live.waitingRoom.length;
-  if (N === live.hudCache._queueN) return; // no change
-  live.hudCache._queueN = N;
+  // bucket so small fluctuations don't trigger DOM rebuilds
+  const bucket = N === 0 ? 0 : N < 12 ? N : Math.floor(N / 4) * 4;
+  if (bucket === live.hudCache._queueBucket) return;
+  live.hudCache._queueBucket = bucket;
   if (N === 0) {
     el.innerHTML = '<span class="queue-empty">no patients waiting</span>';
     return;
   }
-  const show = Math.min(N, 30);
+  const show = Math.min(N, 12);
   let html = '';
   for (let i = 0; i < show; i++) html += '<div class="q-pt"></div>';
-  if (N > show) html += `<span style="font-size:10px;color:var(--yellow);margin-left:6px;">+${N-show}</span>`;
+  html += `<span style="font-size:11px;color:var(--yellow);margin-left:8px;font-family:'Cormorant Garamond',serif;font-style:italic;">${N} waiting</span>`;
   el.innerHTML = html;
 }
 
@@ -1152,18 +1171,29 @@ function endLive() {
   document.getElementById('ip-grid').classList.add('sim-ended');
 }
 
+let lastRenderReal = 0;
 function tick(now) {
   if (!live.running) return;
-  // hard short-circuit if already at end
   if (live.simTime >= live.cfg.simHours) { endLive(); return; }
-  if (live.lastFrame === null) live.lastFrame = now;
-  const dtReal = Math.min(0.1, (now - live.lastFrame) / 1000);
-  live.lastFrame = now;
-  const dtSim = dtReal * live.speed;
-  processEventsUpTo(live.simTime + dtSim);
-  renderHUD();
-  renderQueue();
-  if (live.simTime >= live.cfg.simHours) { endLive(); return; }
+  try {
+    if (live.lastFrame === null) { live.lastFrame = now; lastRenderReal = now; }
+    const dtReal = Math.max(0, Math.min(0.1, (now - live.lastFrame) / 1000));
+    live.lastFrame = now;
+    const dtSim = dtReal * live.speed;
+    processEventsUpTo(live.simTime + dtSim);
+    // throttle DOM updates to ~10 Hz wall-clock — sim still advances at full
+    // speed, just doesn't repaint the HUD / queue / bed-times every frame
+    if (now - lastRenderReal >= 100) {
+      lastRenderReal = now;
+      renderHUD();
+      renderQueue();
+    }
+  } catch (err) {
+    console.error('Sim tick failed; ending live run.', err);
+    endLive();
+    return;
+  }
+  if (live.simTime >= live.cfg.simHours) { endLive(); renderHUD(); renderQueue(); return; }
   requestAnimationFrame(tick);
 }
 
