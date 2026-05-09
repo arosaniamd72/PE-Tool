@@ -235,8 +235,8 @@ canvas { display: block; width: 100%; height: auto; }
   border: 1px solid var(--faint);
   background: rgba(255,255,255,0.015);
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
   color: var(--faint);
+  contain: layout style paint;
 }
 .bed-num {
   position: absolute; top: 3px; left: 5px;
@@ -254,19 +254,11 @@ canvas { display: block; width: 100%; height: auto; }
   color: #4d9de0;
 }
 .bed.boarder {
-  background: rgba(224,90,90,0.18);
-  border-color: rgba(224,90,90,0.65);
-  box-shadow: 0 0 14px rgba(224,90,90,0.25) inset;
+  background: rgba(224,90,90,0.22);
+  border-color: rgba(224,90,90,0.7);
+  box-shadow: 0 0 10px rgba(224,90,90,0.3) inset;
   color: #e05a5a;
-  animation: bedPulse 2.4s ease-in-out infinite;
 }
-@keyframes bedPulse {
-  0%, 100% { opacity: 0.85; }
-  50%      { opacity: 1; }
-}
-/* freeze-fix: stop animations when sim has ended (only red beds pulse, can pin GPU) */
-.bed-grid.sim-ended .bed.boarder,
-.ip-grid.sim-ended .ip-bed.turnaround { animation: none; }
 .bed-time {
   position: absolute; bottom: 3px; right: 5px;
   font-size: 8px;
@@ -276,13 +268,6 @@ canvas { display: block; width: 100%; height: auto; }
 }
 .bed.occupied .bed-time { opacity: 0.85; }
 
-.bed.flash-arrive {
-  animation: flashArrive 0.6s ease;
-}
-@keyframes flashArrive {
-  0%   { background: rgba(255,255,255,0.25); }
-  100% { background: rgba(77,157,224,0.13); }
-}
 
 /* IP grid (compact) */
 .ip-section {
@@ -307,8 +292,8 @@ canvas { display: block; width: 100%; height: auto; }
   border-radius: 2px;
   border: 1px solid var(--faint);
   background: rgba(255,255,255,0.015);
-  transition: background 0.4s ease, border-color 0.4s ease;
   position: relative;
+  contain: layout style paint;
 }
 .ip-bed.occupied {
   background: #6b8eaf;
@@ -317,11 +302,7 @@ canvas { display: block; width: 100%; height: auto; }
 .ip-bed.turnaround {
   background: #d4a94a;
   border-color: #e8c570;
-  animation: ipTat 1.2s ease-in-out infinite;
-}
-@keyframes ipTat {
-  0%, 100% { opacity: 0.65; }
-  50%      { opacity: 1; }
+  opacity: 0.85;
 }
 @media(max-width:720px) {
   .ip-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
@@ -857,9 +838,10 @@ const live = {
   lastBedTimeUpdate: 0 // sim hr of last bed-time text update
 };
 
+const hudEls = {}; // cached element references
 function setIfChanged(id, val) {
   if (live.hudCache[id] !== val) {
-    document.getElementById(id).textContent = val;
+    (hudEls[id] || (hudEls[id] = document.getElementById(id))).textContent = val;
     live.hudCache[id] = val;
   }
 }
@@ -1242,24 +1224,30 @@ function runSim() {
   const status = document.getElementById('status');
   status.textContent = 'running ' + cfg.replicates + ' replicate(s)…';
 
-  // run in next frame so UI repaints
-  setTimeout(() => {
-    const t0 = performance.now();
-    const reps = [];
-    for (let i = 0; i < cfg.replicates; i++) {
-      const r = rng(cfg.seed + i * 1000003);
-      reps.push(simulate(cfg, r));
+  // chunked execution so the main thread can repaint between reps
+  // (otherwise mobile browsers will mark the page unresponsive)
+  const reps = [];
+  let i = 0;
+  const t0 = performance.now();
+  function batch() {
+    const start = performance.now();
+    while (i < cfg.replicates && performance.now() - start < 40) {
+      reps.push(simulate(cfg, rng(cfg.seed + i * 1000003)));
+      i++;
     }
-    const t1 = performance.now();
-    lastResult = { cfg, reps };
-
-    renderStats(cfg, reps);
-    renderOccupancy(cfg, reps[0]);
-    renderBoardQueue(cfg, reps);
-    renderHistogram(cfg, reps);
-
-    status.textContent = `done — ${cfg.replicates} reps in ${(t1-t0).toFixed(0)}ms`;
-  }, 30);
+    if (i < cfg.replicates) {
+      status.textContent = `running… ${i}/${cfg.replicates}`;
+      setTimeout(batch, 0);
+    } else {
+      lastResult = { cfg, reps };
+      renderStats(cfg, reps);
+      renderOccupancy(cfg, reps[0]);
+      renderBoardQueue(cfg, reps);
+      renderHistogram(cfg, reps);
+      status.textContent = `done — ${cfg.replicates} reps in ${(performance.now()-t0).toFixed(0)}ms`;
+    }
+  }
+  setTimeout(batch, 30);
 }
 
 function resetDefaults() {
@@ -1613,10 +1601,10 @@ function renderHistogram(cfg, reps) {
   ctx.fillText('μ='+mQ.toFixed(1), xs(mQ)+4, y0+22);
 }
 
-// auto-run on load
+// On page load: build the live grid only. Monte Carlo runs on demand
+// (it blocks the main thread for hundreds of ms — bad on mobile).
 window.addEventListener('load', () => {
   initLive();
-  runSim();
 });
 window.addEventListener('resize', () => {
   if (lastResult) {
