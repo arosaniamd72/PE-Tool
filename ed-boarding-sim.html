@@ -406,7 +406,12 @@ canvas { display: block; width: 100%; height: auto; }
       <div class="ctrl">
         <label>IP LOS (days)</label>
         <input type="number" id="cfg-ip-los" value="5" min="0.1" step="0.1">
-        <div class="hint">Mean, exponential</div>
+        <div class="hint">Mean (log-normal)</div>
+      </div>
+      <div class="ctrl">
+        <label>LOS σ (log)</label>
+        <input type="number" id="cfg-los-sigma" value="0.6" min="0.05" max="2" step="0.05">
+        <div class="hint">0.6 ≈ realistic</div>
       </div>
       <div class="ctrl">
         <label>DC Hour</label>
@@ -559,7 +564,7 @@ canvas { display: block; width: 100%; height: auto; }
       <strong>Coupling:</strong> ED bed → ED workup → either discharge (88%) or boarder (12%) → IP bed → turnaround → IP bed reopens to next boarder. Boarders are FIFO; oldest boarder claims the next available IP bed.<br>
       <strong>Arrival process:</strong> homogeneous Poisson (constant λ) — no time-of-day or day-of-week variation. Real EDs peak afternoons / evenings.<br>
       <strong>ED workup:</strong> exponential with the entered mean (default 4 hr). Applies to all comers; admit decision happens at end of workup.<br>
-      <strong>IP LOS:</strong> exponential mean × 24 hr; "ready time" is then pushed forward to the next configured DC hour ± Gaussian noise (DC σ).<br>
+      <strong>IP LOS:</strong> log-normal with target mean = IP-LOS-days × 24 hr and log-space σ (default 0.6 → CV ≈ 0.66, realistic for hospital data; CV = 1 corresponds to exponential). Each patient's "ready time" is then pushed forward to the next configured DC hour ± Gaussian noise (DC σ).<br>
       <strong>Turnaround (TAT):</strong> exponential mean 2 hr by default — captures cleaning, bed-board lag, and patient transport.<br>
       <strong>LWBS:</strong> waiting-room patients leave if their wait exceeds the threshold. Reasonable default is 4 hr.<br>
       <strong>Warm start:</strong> live IP unit pre-fills to ~80% with random remaining LOS; Monte Carlo discards the first 48 hr as warmup.<br>
@@ -592,6 +597,13 @@ function expRand(r, mean) { return -Math.log(1 - r()) * mean; }
 function gaussRand(r, mean, sd) {
   const u1 = Math.max(1e-9, r()), u2 = r();
   return mean + sd * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+// Log-normal with target arithmetic mean and log-space sd σ.
+// In log-space: μ = ln(targetMean) − σ²/2, so E[X] = exp(μ + σ²/2) = targetMean.
+// CV = sqrt(exp(σ²) − 1). σ=0.6 → CV ≈ 0.66 (vs 1.0 for exponential).
+function lognormRand(r, targetMean, sigma) {
+  const mu = Math.log(targetMean) - sigma * sigma / 2;
+  return Math.exp(mu + sigma * gaussRand(r, 0, 1));
 }
 // Scheduled IP discharge time: next occurrence of dcHour after readyTime, ± gaussian noise
 function scheduleIPDischarge(readyTime, cfg, r) {
@@ -633,8 +645,9 @@ function simulate(cfg, r) {
   const seedFill = Math.floor(cfg.ipBeds * 0.8);
   for (let i = 0; i < seedFill; i++) {
     const ipBed = ipBeds[i];
-    const tEntered = -expRand(r, cfg.ipLosDays * 24 * 0.5);
-    const ready = tEntered + expRand(r, cfg.ipLosDays * 24);
+    const losTotalHr = lognormRand(r, cfg.ipLosDays * 24, cfg.losSigma);
+    const tEntered = -r() * losTotalHr; // uniform elapsed-in-bed already
+    const ready = tEntered + losTotalHr;
     const pt = { ipBedTime: tEntered, willAdmit: true, arriveTime: tEntered };
     pt.ipDischargeTime = scheduleIPDischarge(Math.max(0, ready), cfg, r);
     ipBed.state = 'occupied';
@@ -674,7 +687,7 @@ function simulate(cfg, r) {
     ipBed.state = 'occupied';
     ipBed.pt = pt;
     pt.ipBedTime = t;
-    const losHr = expRand(r, cfg.ipLosDays * 24);
+    const losHr = lognormRand(r, cfg.ipLosDays * 24, cfg.losSigma);
     const ready = t + losHr;
     pt.ipDischargeTime = scheduleIPDischarge(ready, cfg, r);
     pushEvent({ time: pt.ipDischargeTime, kind: 'ip-discharge', bed: ipBed });
@@ -936,11 +949,12 @@ function initLive() {
   const seedFill = Math.floor(cfg.ipBeds * 0.8);
   for (let i = 0; i < seedFill; i++) {
     const ipBed = live.ipBeds[i];
-    const fakeTime = -expRand(live.rng, cfg.ipLosDays * 24 * 0.5); // negative arrival
+    const losTotalHr = lognormRand(live.rng, cfg.ipLosDays * 24, cfg.losSigma);
+    const fakeTime = -live.rng() * losTotalHr; // uniform elapsed-in-bed already
     const pt = { ipBedTime: fakeTime, willAdmit: true, arriveTime: fakeTime };
     ipBed.state = 'occupied';
     ipBed.pt = pt;
-    const ready = fakeTime + expRand(live.rng, cfg.ipLosDays * 24);
+    const ready = fakeTime + losTotalHr;
     pt.ipDischargeTime = scheduleIPDischarge(Math.max(0, ready), cfg, live.rng);
     ipBed.el.classList.add('occupied');
   }
@@ -972,7 +986,7 @@ function admitToIPBed(ipBed, pt, t) {
   ipBed.state = 'occupied';
   ipBed.pt = pt;
   pt.ipBedTime = t;
-  const losHr = expRand(live.rng, live.cfg.ipLosDays * 24);
+  const losHr = lognormRand(live.rng, live.cfg.ipLosDays * 24, live.cfg.losSigma);
   pt.ipDischargeTime = scheduleIPDischarge(t + losHr, live.cfg, live.rng);
   ipBed.el.classList.remove('turnaround');
   ipBed.el.classList.add('occupied');
@@ -1270,6 +1284,7 @@ function readCfg() {
     admitRate:     +document.getElementById('cfg-admit').value / 100,
     losDischarged: +document.getElementById('cfg-los-d').value,
     ipLosDays:     +document.getElementById('cfg-ip-los').value,
+    losSigma:      +document.getElementById('cfg-los-sigma').value,
     dcHour:        +document.getElementById('cfg-dc-hour').value,
     dcSigma:       +document.getElementById('cfg-dc-sigma').value,
     tat:           +document.getElementById('cfg-tat').value,
@@ -1319,6 +1334,7 @@ function resetDefaults() {
   document.getElementById('cfg-admit').value = 12;
   document.getElementById('cfg-los-d').value = 4;
   document.getElementById('cfg-ip-los').value = 5;
+  document.getElementById('cfg-los-sigma').value = 0.6;
   document.getElementById('cfg-dc-hour').value = 12;
   document.getElementById('cfg-dc-sigma').value = 2.5;
   document.getElementById('cfg-tat').value = 2;
@@ -1679,8 +1695,8 @@ window.addEventListener('resize', () => {
 
 // Re-init the live grid when params change (debounced)
 let cfgChangeTimer = null;
-['cfg-beds','cfg-ip-beds','cfg-admit','cfg-los-d','cfg-ip-los','cfg-dc-hour','cfg-dc-sigma',
- 'cfg-tat','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
+['cfg-beds','cfg-ip-beds','cfg-admit','cfg-los-d','cfg-ip-los','cfg-los-sigma',
+ 'cfg-dc-hour','cfg-dc-sigma','cfg-tat','cfg-lwbs','cfg-arr','cfg-hours','cfg-seed'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => {
     clearTimeout(cfgChangeTimer);
     cfgChangeTimer = setTimeout(() => {
