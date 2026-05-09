@@ -261,9 +261,12 @@ canvas { display: block; width: 100%; height: auto; }
   animation: bedPulse 2.4s ease-in-out infinite;
 }
 @keyframes bedPulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(224,90,90,0.20) inset; }
-  50%      { box-shadow: 0 0 18px rgba(224,90,90,0.45) inset, 0 0 8px rgba(224,90,90,0.3); }
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
 }
+/* freeze-fix: stop animations when sim has ended (only red beds pulse, can pin GPU) */
+.bed-grid.sim-ended .bed.boarder,
+.ip-grid.sim-ended .ip-bed.turnaround { animation: none; }
 .bed-time {
   position: absolute; bottom: 3px; right: 5px;
   font-size: 8px;
@@ -880,6 +883,7 @@ function buildBedGrid() {
   live.cfg = cfg;
   // ED grid
   const edGrid = document.getElementById('bed-grid');
+  edGrid.classList.remove('sim-ended');
   edGrid.innerHTML = '';
   const edCols = Math.min(10, Math.ceil(Math.sqrt(cfg.beds * 1.6)));
   edGrid.style.gridTemplateColumns = `repeat(${edCols}, minmax(0, 1fr))`;
@@ -897,6 +901,7 @@ function buildBedGrid() {
   }
   // IP grid
   const ipGrid = document.getElementById('ip-grid');
+  ipGrid.classList.remove('sim-ended');
   ipGrid.innerHTML = '';
   const ipCols = Math.min(20, Math.ceil(Math.sqrt(cfg.ipBeds * 1.8)));
   ipGrid.style.gridTemplateColumns = `repeat(${ipCols}, minmax(0, 1fr))`;
@@ -1013,6 +1018,8 @@ function purgeLWBS(t) {
 }
 
 function processEventsUpTo(targetT) {
+  // never advance past the configured sim end
+  targetT = Math.min(targetT, live.cfg.simHours);
   while (true) {
     let nextT = Infinity, nextKind = null, nextRef = null;
 
@@ -1156,20 +1163,25 @@ function renderQueue() {
   el.innerHTML = html;
 }
 
+function endLive() {
+  live.running = false;
+  document.getElementById('btn-play').textContent = '▶ Replay';
+  document.getElementById('bed-grid').classList.add('sim-ended');
+  document.getElementById('ip-grid').classList.add('sim-ended');
+}
+
 function tick(now) {
   if (!live.running) return;
+  // hard short-circuit if already at end
+  if (live.simTime >= live.cfg.simHours) { endLive(); return; }
   if (live.lastFrame === null) live.lastFrame = now;
-  const dtReal = Math.min(0.1, (now - live.lastFrame) / 1000); // clamp big jumps
+  const dtReal = Math.min(0.1, (now - live.lastFrame) / 1000);
   live.lastFrame = now;
   const dtSim = dtReal * live.speed;
   processEventsUpTo(live.simTime + dtSim);
   renderHUD();
   renderQueue();
-  if (live.simTime >= live.cfg.simHours) {
-    live.running = false;
-    document.getElementById('btn-play').textContent = '▶ Replay';
-    return;
-  }
+  if (live.simTime >= live.cfg.simHours) { endLive(); return; }
   requestAnimationFrame(tick);
 }
 
