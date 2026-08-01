@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rhythm Box · Drum Machine</title>
+<style>
+:root {
+  --bg: #0b0d12;
+  --panel: #14171f;
+  --panel2: #1b1f2a;
+  --border: #262b38;
+  --border2: #333a4c;
+  --text: #e4e8f0;
+  --muted: #7c869b;
+  --accent: #ff6b4a;
+  --accent2: #ffab4a;
+  --cyan: #45c9d4;
+  --green: #4fd18b;
+  --purple: #9d7bff;
+  --step-off: #20242f;
+  --step-on: #ff6b4a;
+  --beat-line: #2c3242;
+  --playhead: #ffab4a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(circle at 50% 0%, #161a24 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  padding: 24px 16px 64px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand .logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  box-shadow: 0 4px 20px rgba(255,107,74,0.35);
+}
+
+.brand h1 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ── TRANSPORT ── */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  user-select: none;
+}
+.btn:hover { border-color: var(--muted); background: #222735; }
+.btn:active { transform: translateY(1px); }
+
+.btn-play {
+  background: linear-gradient(135deg, var(--green) 0%, #3bb877 100%);
+  border-color: transparent;
+  color: #06110b;
+  min-width: 104px;
+  justify-content: center;
+}
+.btn-play.playing {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  color: #1a0d06;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.control label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.control .value {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent2);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 4px;
+  background: var(--border2);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].tempo { width: 140px; }
+input[type="range"].swing { width: 92px; }
+input[type="range"].vol { width: 74px; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: 2px solid #1a0d06;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  background: var(--accent2);
+  border: 2px solid #1a0d06;
+  cursor: pointer;
+}
+
+.spacer { flex: 1; }
+
+select {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+/* ── SEQUENCER ── */
+.sequencer {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.step-numbers {
+  display: grid;
+  grid-template-columns: 168px repeat(16, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+  min-width: 720px;
+}
+.step-numbers .label-cell { }
+.step-numbers .num {
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-bottom: 2px;
+}
+.step-numbers .num.beat { color: var(--accent2); font-weight: 700; }
+
+.track {
+  display: grid;
+  grid-template-columns: 168px repeat(16, 1fr);
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+  min-width: 720px;
+}
+
+.track-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  height: 100%;
+}
+.track-swatch {
+  width: 9px;
+  height: 26px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.track-meta { flex: 1; min-width: 0; }
+.track-name {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.track-name .mute-tag {
+  font-size: 9px;
+  color: var(--accent);
+  margin-left: 4px;
+  display: none;
+}
+.track.muted .track-name .mute-tag { display: inline; }
+.track-vol {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+}
+.mute-btn {
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mute-btn.active { background: var(--accent); color: #1a0d06; border-color: transparent; }
+
+.step {
+  aspect-ratio: 1;
+  min-height: 30px;
+  border-radius: 7px;
+  background: var(--step-off);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.06s ease, background 0.06s ease;
+  position: relative;
+}
+.step:hover { border-color: var(--muted); }
+.step.beat-start { border-left: 2px solid var(--beat-line); }
+.step.on {
+  border-color: transparent;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.3) inset;
+}
+.step.playhead::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9px;
+  border: 2px solid var(--playhead);
+  pointer-events: none;
+}
+.step.flash { transform: scale(0.86); }
+.track.muted .step.on { opacity: 0.32; }
+
+/* ── FOOTER ── */
+.hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 20px;
+  line-height: 1.7;
+}
+kbd {
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: inherit;
+}
+
+@media (max-width: 560px) {
+  .brand p { display: none; }
+  .transport { padding: 12px; gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">🥁</div>
+      <div>
+        <h1>Rhythm Box</h1>
+        <p>16-step drum machine · Web Audio synthesis</p>
+      </div>
+    </div>
+    <div class="brand-right">
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn" id="randomBtn">🎲 Random</button>
+    </div>
+  </header>
+
+  <div class="transport">
+    <button class="btn btn-play" id="playBtn">▶ Play</button>
+
+    <div class="control">
+      <label>Tempo · <span class="value" id="tempoVal">120</span> BPM</label>
+      <div class="slider-row">
+        <input type="range" class="tempo" id="tempo" min="50" max="200" value="120">
+      </div>
+    </div>
+
+    <div class="control">
+      <label>Swing · <span class="value" id="swingVal">0</span>%</label>
+      <div class="slider-row">
+        <input type="range" class="swing" id="swing" min="0" max="60" value="0">
+      </div>
+    </div>
+
+    <div class="control">
+      <label>Master · <span class="value" id="masterVal">80</span>%</label>
+      <div class="slider-row">
+        <input type="range" class="vol" id="master" min="0" max="100" value="80">
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="control">
+      <label>Pattern</label>
+      <select id="preset">
+        <option value="empty">— Presets —</option>
+        <option value="fourfloor">Four on the Floor</option>
+        <option value="boombap">Boom Bap</option>
+        <option value="house">House Groove</option>
+        <option value="trap">Trap Hats</option>
+        <option value="rock">Rock Beat</option>
+        <option value="breakbeat">Breakbeat</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sequencer" id="sequencer"></div>
+
+  <p class="hint">
+    Click cells to program a beat · <kbd>Space</kbd> play/stop · <kbd>C</kbd> clear · <kbd>R</kbd> randomize<br>
+    All sounds are synthesized live in your browser — nothing to download.
+  </p>
+</div>
+
+<script>
+"use strict";
+
+const STEPS = 16;
+
+// ── Instrument definitions ─────────────────────────────────
+// Each has a synth function that schedules audio at time `t`.
+const INSTRUMENTS = [
+  { id: "kick",  name: "Kick",       color: "#ff6b4a", gain: 1.0 },
+  { id: "snare", name: "Snare",      color: "#ffab4a", gain: 0.8 },
+  { id: "clap",  name: "Clap",       color: "#9d7bff", gain: 0.8 },
+  { id: "chh",   name: "Hat (closed)", color: "#45c9d4", gain: 0.55 },
+  { id: "ohh",   name: "Hat (open)", color: "#4fd18b", gain: 0.5 },
+  { id: "tom",   name: "Tom",        color: "#e0607a", gain: 0.8 },
+  { id: "clave", name: "Clave",      color: "#c7d24f", gain: 0.7 },
+];
+
+// State: pattern[instrumentIndex][step] = 0|1
+let pattern = INSTRUMENTS.map(() => new Array(STEPS).fill(0));
+let trackVol = INSTRUMENTS.map(i => i.gain);
+let trackMuted = INSTRUMENTS.map(() => false);
+
+let isPlaying = false;
+let currentStep = 0;
+let tempo = 120;
+let swing = 0;
+let masterVol = 0.8;
+
+// ── Audio engine ───────────────────────────────────────────
+let ac = null;
+let masterGain = null;
+
+function initAudio() {
+  if (ac) return;
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = ac.createGain();
+  masterGain.gain.value = masterVol;
+  masterGain.connect(ac.destination);
+}
+
+function envGain(t, peak, attack, decay, sustainLevel, release, holdDur) {
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + attack);
+  if (holdDur != null) {
+    g.gain.setValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * sustainLevel), t + attack + holdDur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + holdDur + release);
+  } else {
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  }
+  return g;
+}
+
+function noiseBuffer(dur) {
+  const len = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+// Individual voices ─────────────────────────────────────────
+const voices = {
+  kick(t, vol) {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    osc.connect(g).connect(masterGain);
+    osc.start(t); osc.stop(t + 0.45);
+  },
+  snare(t, vol) {
+    // noise body
+    const n = ac.createBufferSource();
+    n.buffer = noiseBuffer(0.2);
+    const nf = ac.createBiquadFilter();
+    nf.type = "highpass"; nf.frequency.value = 1400;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(vol, t);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    n.connect(nf).connect(ng).connect(masterGain);
+    n.start(t); n.stop(t + 0.2);
+    // tonal snap
+    const osc = ac.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(190, t);
+    const og = ac.createGain();
+    og.gain.setValueAtTime(vol * 0.5, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    osc.connect(og).connect(masterGain);
+    osc.start(t); osc.stop(t + 0.11);
+  },
+  clap(t, vol) {
+    // three quick noise bursts
+    const nf = ac.createBiquadFilter();
+    nf.type = "bandpass"; nf.frequency.value = 1200; nf.Q.value = 1.2;
+    nf.connect(masterGain);
+    [0, 0.01, 0.02, 0.035].forEach((off, i) => {
+      const n = ac.createBufferSource();
+      n.buffer = noiseBuffer(0.09);
+      const g = ac.createGain();
+      const peak = vol * (i === 3 ? 1 : 0.7);
+      g.gain.setValueAtTime(0, t + off);
+      g.gain.linearRampToValueAtTime(peak, t + off + 0.001);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + off + (i === 3 ? 0.12 : 0.03));
+      n.connect(g).connect(nf);
+      n.start(t + off); n.stop(t + off + 0.13);
+    });
+  },
+  chh(t, vol) { hat(t, vol, 0.045); },
+  ohh(t, vol) { hat(t, vol, 0.3); },
+  tom(t, vol) {
+    const osc = ac.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(90, t + 0.25);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(g).connect(masterGain);
+    osc.start(t); osc.stop(t + 0.36);
+  },
+  clave(t, vol) {
+    const osc = ac.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1150, t);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(vol * 0.6, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    osc.connect(g).connect(masterGain);
+    osc.start(t); osc.stop(t + 0.07);
+  },
+};
+
+function hat(t, vol, dur) {
+  const n = ac.createBufferSource();
+  n.buffer = noiseBuffer(dur + 0.02);
+  const hp = ac.createBiquadFilter();
+  hp.type = "highpass"; hp.frequency.value = 7000;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  n.connect(hp).connect(g).connect(masterGain);
+  n.start(t); n.stop(t + dur + 0.02);
+}
+
+function triggerVoice(instIndex, t) {
+  if (trackMuted[instIndex]) return;
+  const inst = INSTRUMENTS[instIndex];
+  const v = trackVol[instIndex];
+  voices[inst.id](t, v);
+}
+
+// Preview a single hit immediately (on manual toggle)
+function previewHit(instIndex) {
+  initAudio();
+  if (ac.state === "suspended") ac.resume();
+  triggerVoice(instIndex, ac.currentTime + 0.001);
+}
+
+// ── Scheduler (look-ahead) ─────────────────────────────────
+let nextNoteTime = 0;
+let schedulerTimer = null;
+const LOOKAHEAD = 25;      // ms
+const SCHEDULE_AHEAD = 0.1; // s
+
+function stepDuration() {
+  // sixteenth note duration
+  return (60 / tempo) / 4;
+}
+
+function scheduleStep(step, time) {
+  for (let i = 0; i < INSTRUMENTS.length; i++) {
+    if (pattern[i][step]) triggerVoice(i, time);
+  }
+  // schedule UI update
+  const uiDelay = (time - ac.currentTime) * 1000;
+  setTimeout(() => paintPlayhead(step), Math.max(0, uiDelay));
+}
+
+function scheduler() {
+  while (nextNoteTime < ac.currentTime + SCHEDULE_AHEAD) {
+    const swingOffset = (currentStep % 2 === 1) ? stepDuration() * (swing / 100) : 0;
+    scheduleStep(currentStep, nextNoteTime + swingOffset);
+    nextNoteTime += stepDuration();
+    currentStep = (currentStep + 1) % STEPS;
+  }
+  schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
+}
+
+function play() {
+  initAudio();
+  if (ac.state === "suspended") ac.resume();
+  isPlaying = true;
+  currentStep = 0;
+  nextNoteTime = ac.currentTime + 0.05;
+  scheduler();
+  const b = document.getElementById("playBtn");
+  b.textContent = "■ Stop";
+  b.classList.add("playing");
+}
+
+function stop() {
+  isPlaying = false;
+  clearTimeout(schedulerTimer);
+  const b = document.getElementById("playBtn");
+  b.textContent = "▶ Play";
+  b.classList.remove("playing");
+  clearPlayhead();
+}
+
+function togglePlay() { isPlaying ? stop() : play(); }
+
+// ── UI: build grid ─────────────────────────────────────────
+const sequencer = document.getElementById("sequencer");
+
+function buildGrid() {
+  sequencer.innerHTML = "";
+
+  // step numbers row
+  const nums = document.createElement("div");
+  nums.className = "step-numbers";
+  nums.appendChild(document.createElement("div")).className = "label-cell";
+  for (let s = 0; s < STEPS; s++) {
+    const n = document.createElement("div");
+    n.className = "num" + (s % 4 === 0 ? " beat" : "");
+    n.textContent = s + 1;
+    nums.appendChild(n);
+  }
+  sequencer.appendChild(nums);
+
+  INSTRUMENTS.forEach((inst, i) => {
+    const track = document.createElement("div");
+    track.className = "track";
+    track.dataset.inst = i;
+
+    // info cell
+    const info = document.createElement("div");
+    info.className = "track-info";
+    info.innerHTML = `
+      <div class="track-swatch" style="background:${inst.color}"></div>
+      <div class="track-meta">
+        <div class="track-name">${inst.name}<span class="mute-tag">MUTE</span></div>
+        <div class="track-vol">
+          <input type="range" class="vol track-vol-slider" min="0" max="100" value="${Math.round(trackVol[i]*100)}">
+        </div>
+      </div>
+      <button class="mute-btn" title="Mute">M</button>
+    `;
+    track.appendChild(info);
+
+    const volSlider = info.querySelector(".track-vol-slider");
+    volSlider.addEventListener("input", e => { trackVol[i] = e.target.value / 100; });
+
+    const muteBtn = info.querySelector(".mute-btn");
+    muteBtn.addEventListener("click", () => {
+      trackMuted[i] = !trackMuted[i];
+      muteBtn.classList.toggle("active", trackMuted[i]);
+      track.classList.toggle("muted", trackMuted[i]);
+    });
+
+    // step cells
+    for (let s = 0; s < STEPS; s++) {
+      const cell = document.createElement("div");
+      cell.className = "step" + (s % 4 === 0 ? " beat-start" : "");
+      cell.dataset.inst = i;
+      cell.dataset.step = s;
+      if (pattern[i][s]) {
+        cell.classList.add("on");
+        cell.style.background = inst.color;
+      }
+      cell.addEventListener("click", () => toggleCell(i, s, cell, inst));
+      track.appendChild(cell);
+    }
+    sequencer.appendChild(track);
+  });
+}
+
+function toggleCell(i, s, cell, inst) {
+  pattern[i][s] = pattern[i][s] ? 0 : 1;
+  if (pattern[i][s]) {
+    cell.classList.add("on");
+    cell.style.background = inst.color;
+    previewHit(i);
+  } else {
+    cell.classList.remove("on");
+    cell.style.background = "";
+  }
+}
+
+// ── Playhead painting ──────────────────────────────────────
+let lastPlayheadStep = -1;
+function paintPlayhead(step) {
+  if (!isPlaying) return;
+  clearPlayhead();
+  lastPlayheadStep = step;
+  const cells = sequencer.querySelectorAll(`.step[data-step="${step}"]`);
+  cells.forEach(c => {
+    c.classList.add("playhead");
+    if (c.classList.contains("on")) {
+      c.classList.add("flash");
+      setTimeout(() => c.classList.remove("flash"), 90);
+    }
+  });
+}
+function clearPlayhead() {
+  sequencer.querySelectorAll(".step.playhead").forEach(c => c.classList.remove("playhead"));
+}
+
+// ── Presets ────────────────────────────────────────────────
+// Format: { instId: [steps that are ON] }
+const PRESETS = {
+  empty: {},
+  fourfloor: {
+    kick:  [0,4,8,12],
+    chh:   [2,6,10,14],
+    ohh:   [],
+    clap:  [4,12],
+    clave: [],
+  },
+  boombap: {
+    kick:  [0,3,8,10],
+    snare: [4,12],
+    chh:   [0,2,4,6,8,10,12,14],
+    ohh:   [7,15],
+  },
+  house: {
+    kick:  [0,4,8,12],
+    clap:  [4,12],
+    chh:   [2,6,10,14],
+    ohh:   [6,14],
+    clave: [10],
+  },
+  trap: {
+    kick:  [0,6,10],
+    snare: [8],
+    chh:   [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
+    ohh:   [3,11],
+  },
+  rock: {
+    kick:  [0,4,8,10,12],
+    snare: [4,12],
+    chh:   [0,2,4,6,8,10,12,14],
+    tom:   [15],
+  },
+  breakbeat: {
+    kick:  [0,10],
+    snare: [4,12,14],
+    chh:   [0,2,4,6,8,10,12,14],
+    ohh:   [7],
+    tom:   [11],
+  },
+};
+
+function loadPreset(name) {
+  const p = PRESETS[name];
+  pattern = INSTRUMENTS.map(() => new Array(STEPS).fill(0));
+  if (p) {
+    INSTRUMENTS.forEach((inst, i) => {
+      if (p[inst.id]) p[inst.id].forEach(s => { if (s < STEPS) pattern[i][s] = 1; });
+    });
+  }
+  buildGrid();
+}
+
+function clearAll() {
+  pattern = INSTRUMENTS.map(() => new Array(STEPS).fill(0));
+  buildGrid();
+  document.getElementById("preset").value = "empty";
+}
+
+function randomize() {
+  const densities = { kick:0.28, snare:0.15, clap:0.12, chh:0.55, ohh:0.15, tom:0.1, clave:0.1 };
+  pattern = INSTRUMENTS.map((inst) => {
+    const d = densities[inst.id] ?? 0.2;
+    return new Array(STEPS).fill(0).map(() => Math.random() < d ? 1 : 0);
+  });
+  // guarantee a kick on beat 1
+  pattern[0][0] = 1;
+  buildGrid();
+  document.getElementById("preset").value = "empty";
+}
+
+// ── Wire up controls ───────────────────────────────────────
+document.getElementById("playBtn").addEventListener("click", togglePlay);
+document.getElementById("clearBtn").addEventListener("click", clearAll);
+document.getElementById("randomBtn").addEventListener("click", randomize);
+
+document.getElementById("tempo").addEventListener("input", e => {
+  tempo = +e.target.value;
+  document.getElementById("tempoVal").textContent = tempo;
+});
+document.getElementById("swing").addEventListener("input", e => {
+  swing = +e.target.value;
+  document.getElementById("swingVal").textContent = swing;
+});
+document.getElementById("master").addEventListener("input", e => {
+  masterVol = e.target.value / 100;
+  document.getElementById("masterVal").textContent = e.target.value;
+  if (masterGain) masterGain.gain.value = masterVol;
+});
+document.getElementById("preset").addEventListener("change", e => {
+  if (e.target.value) loadPreset(e.target.value);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+  else if (e.key.toLowerCase() === "c") clearAll();
+  else if (e.key.toLowerCase() === "r") randomize();
+});
+
+// ── Init ───────────────────────────────────────────────────
+loadPreset("fourfloor");
+document.getElementById("preset").value = "fourfloor";
+</script>
+</body>
+</html>
