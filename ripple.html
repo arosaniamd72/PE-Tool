@@ -83,6 +83,38 @@
     text-wrap: pretty;
   }
 
+  .legend {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    max-width: 900px;
+    margin: 1.75rem auto 0;
+    text-align: left;
+  }
+  @media (max-width: 720px) { .legend { grid-template-columns: 1fr; } }
+  .legend li {
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--muted);
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.015);
+  }
+  .legend b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cool);
+    margin-bottom: 0.35rem;
+    font-weight: 500;
+  }
+  .legend em { font-style: italic; color: var(--foam); }
+
   /* ---------- ponds ---------- */
   .ponds {
     display: grid;
@@ -260,6 +292,11 @@
         with everything it has. On the right, one small touch — passed gently from
         neighbor to neighbor. Watch which one travels farther, and which one lasts.
       </p>
+      <ul class="legend">
+        <li><b>Receivers saturate.</b> One overwhelming push converts poorly — a person can only take in so much at once.</li>
+        <li><b>Small inputs sum.</b> Many gentle inputs each land in the responsive range and reinforce, adding up past any single blast.</li>
+        <li><b>Echoes resonate.</b> Every touch travels onward <em>and back</em> — returning home, re-exciting, setting out again.</li>
+      </ul>
     </header>
 
     <div class="ponds">
@@ -361,16 +398,20 @@
   const RING_W     = 34;    // wavefront thickness
   const AMP_DECAY  = 3.5;   // how fast a single front spends itself (age-based)
   const GEO        = 0.0018;// geometric spreading with radius
-  const INJECT     = 6.0;   // front energy -> node energy
-  const GLOW_DECAY = 2.3;   // how fast a node's glow fades
-  const ACTIVE     = 0.07;  // "this node has been reached"
-  const FIRE_TH    = 0.05;  // ripple: energy needed to relay onward
-  const REARM      = 0.018; // ripple: re-arm below this
-  const REFRAC     = 0.32;  // ripple: min seconds between a node's fires
-  const MAX_FIRES  = 5;     // guarantees the cascade terminates
+  const INJECT     = 7.0;   // front strength -> node energy
+  const GLOW_DECAY = 2.1;   // how fast a node's glow fades
+  const SAT        = 0.12;  // receiver saturation: how much of ONE input a node can take.
+                            // A single huge front saturates near SAT (wasted amplitude);
+                            // many small fronts each stay linear and SUM past it.
+  const ACTIVE     = 0.05;  // "this node has been reached"
+  const FIRE_TH    = 0.035; // ripple: energy needed to relay onward
+  const REARM      = 0.02;  // ripple: re-arm to fire again below this
+  const REFRAC     = 0.28;  // ripple: min seconds between a node's fires
+  const MAX_FIRES  = 16;    // safety ceiling; fatigue ends the ring-down well before this
+  const FATIGUE    = 0.9;   // each successive relay is a little weaker -> damped resonance
   const E_LOUD     = 1.0;   // the one giant stone
-  const E_RIPPLE   = 0.24;  // each gentle touch (renewed every hop)
-  const QUIET      = 0.35;  // seconds of silence before "duration" freezes
+  const E_RIPPLE   = 0.26;  // each gentle touch (renewed, and echoed back, every hop)
+  const QUIET      = 0.4;   // seconds of silence before "duration" freezes
 
   class Sim {
     constructor(canvas, mode) {
@@ -453,19 +494,27 @@
           const band = Math.exp(-(df*df) / (2*RING_W*RING_W));
           if (band < 0.004) continue;
           const geo = 1 / (1 + d * GEO);
-          rate += amp * band * geo;
+          // receiver response: each input is saturated on its own (one giant
+          // front converts poorly), but separate inputs SUM (many small ones win)
+          const input = amp * geo;
+          const felt = input / (1 + input / SAT);
+          rate += felt * band;
         }
         nd.e += rate * INJECT * dt;
         nd.e *= Math.exp(-GLOW_DECAY * dt);
         if (nd.e > nd.peak) nd.peak = nd.e;
 
-        // the ripple: a touched node becomes a new source
+        // the ripple: a touched node becomes a new source, in every direction —
+        // including back the way the wave came, so echoes return home and set out
+        // again. Each relay fatigues slightly, so the network rings down instead
+        // of exploding: a damped resonance, not a one-way sweep.
         if (this.mode === "ripple") {
           if (nd.armed && nd.e > FIRE_TH && nd.fires < MAX_FIRES && (this.t - nd.last) > REFRAC) {
             nd.armed = false;
             nd.last = this.t;
+            const emitE = E_RIPPLE * Math.pow(FATIGUE, nd.fires);
             nd.fires++;
-            for (const j of NET.adj[i]) this.emit(j, E_RIPPLE);
+            for (const j of NET.adj[i]) this.emit(j, emitE);
           }
           if (nd.e < REARM) nd.armed = true;
         }
@@ -600,8 +649,8 @@
     res.classList.toggle("hot", hot);
   }
 
-  const CAP_LOUD_DONE   = "Loud, brief, and local. The far shore never felt it.";
-  const CAP_RIPPLE_DONE = "It reached everyone — and kept ringing long after the shout went quiet.";
+  const CAP_LOUD_DONE   = "One overwhelming push. It saturates whoever's nearest, and the far shore never feels it at all.";
+  const CAP_RIPPLE_DONE = "Small enough to land everywhere — echoes returned, re-excited, and set out again. The network kept ringing.";
 
   let last = performance.now();
   function frame(now) {
