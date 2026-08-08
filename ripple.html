@@ -359,11 +359,11 @@
   // ---- tunable physics ----
   const C          = 540;   // wavefront speed (logical units / s)
   const RING_W     = 34;    // wavefront thickness
-  const AMP_DECAY  = 1.35;  // how fast a single front spends itself
+  const AMP_DECAY  = 3.5;   // how fast a single front spends itself (age-based)
   const GEO        = 0.0018;// geometric spreading with radius
-  const INJECT     = 7.0;   // front energy -> node energy
+  const INJECT     = 6.0;   // front energy -> node energy
   const GLOW_DECAY = 2.3;   // how fast a node's glow fades
-  const ACTIVE     = 0.055; // "this node has been reached"
+  const ACTIVE     = 0.07;  // "this node has been reached"
   const FIRE_TH    = 0.05;  // ripple: energy needed to relay onward
   const REARM      = 0.018; // ripple: re-arm below this
   const REFRAC     = 0.32;  // ripple: min seconds between a node's fires
@@ -422,16 +422,20 @@
       if (!this.running) return;
       this.t += dt;
 
-      // advance & retire rings
+      // advance & retire rings (compute amp/age fresh — never trust a stale field,
+      // since relays can push new rings mid-loop below)
       const alive = [];
       for (const ring of this.rings) {
         const age = this.t - ring.born;
         const amp = ring.e * Math.exp(-AMP_DECAY * age);
-        if (amp > 0.006 && age < 6) { ring.age = age; ring.amp = amp; alive.push(ring); }
+        if (amp > 0.006 && age < 6) alive.push(ring);
       }
       this.rings = alive;
 
-      let anyRing = this.rings.length > 0;
+      // snapshot the rings that exist at the start of this step; any ring a node
+      // relays into existence this frame will only act on the NEXT frame.
+      const active = this.rings.slice();
+      let anyRing = active.length > 0;
       let totalGlow = 0;
 
       for (let i = 0; i < this.nodes.length; i++) {
@@ -439,15 +443,17 @@
         const p = NET.nodes[i];
         // energy delivered by every passing front this frame
         let rate = 0;
-        for (const ring of this.rings) {
-          const r = C * ring.age;
+        for (const ring of active) {
+          const age = this.t - ring.born;
+          const amp = ring.e * Math.exp(-AMP_DECAY * age);
+          const r = C * age;
           const dx = p.x - ring.x, dy = p.y - ring.y;
           const d = Math.hypot(dx, dy);
           const df = d - r;                          // distance from the wavefront
           const band = Math.exp(-(df*df) / (2*RING_W*RING_W));
           if (band < 0.004) continue;
           const geo = 1 / (1 + d * GEO);
-          rate += ring.amp * band * geo;
+          rate += amp * band * geo;
         }
         nd.e += rate * INJECT * dt;
         nd.e *= Math.exp(-GLOW_DECAY * dt);
@@ -518,7 +524,7 @@
       ctx.fillStyle = "rgba(150,190,200,0.28)";
       ctx.arc(p.x, p.y, 2.4, 0, Math.PI*2);
       ctx.fill();
-      if (glow <= 0.01) return;
+      if (!(glow > 0.01)) return;              // also bails on NaN, never feeds a bad radius
       const g = Math.min(1, glow);
       const rad = 6 + g * 42;
       const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
@@ -549,10 +555,12 @@
       ctx.globalCompositeOperation = "lighter";
       // wavefronts
       for (const ring of this.rings) {
-        const r = C * ring.age;
+        const age = this.t - ring.born;
+        const r = C * age;
         if (r < 1) continue;
+        const amp = ring.e * Math.exp(-AMP_DECAY * age);
         ctx.beginPath();
-        ctx.strokeStyle = this.col(Math.min(0.9, ring.amp * 1.5));
+        ctx.strokeStyle = this.col(Math.min(0.9, amp * 1.5));
         ctx.lineWidth = 2.2;
         ctx.arc(ring.x, ring.y, r, 0, Math.PI*2);
         ctx.stroke();
