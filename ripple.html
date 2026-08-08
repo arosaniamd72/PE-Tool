@@ -293,9 +293,9 @@
         neighbor to neighbor. Watch which one travels farther, and which one lasts.
       </p>
       <ul class="legend">
-        <li><b>Receivers saturate.</b> One overwhelming push converts poorly — a person can only take in so much at once.</li>
-        <li><b>Small inputs sum.</b> Many gentle inputs each land in the responsive range and reinforce, adding up past any single blast.</li>
-        <li><b>Echoes resonate.</b> Every touch travels onward <em>and back</em> — returning home, re-exciting, setting out again.</li>
+        <li><b>Amplitude isn't impact.</b> Loud is big but shallow — it washes over people and burns off. A quiet signal can land deep and stay.</li>
+        <li><b>Impact compounds.</b> What genuinely moves your neighbor makes <em>them</em> move theirs. Small, real effects add up through feedback.</li>
+        <li><b>Recovery primes.</b> A node that's been moved comes back <em>more</em> receptive than before — so the next ripple carries even further.</li>
       </ul>
     </header>
 
@@ -303,7 +303,7 @@
       <section class="pond loud" id="pond-loud">
         <div class="pond-head">
           <div class="pond-name">The Loud One</div>
-          <div class="pond-tag">one source<br>massive amplitude</div>
+          <div class="pond-tag">high amplitude<br>low impact</div>
         </div>
         <div class="stage"><canvas id="c-loud"></canvas></div>
         <div class="metrics">
@@ -311,13 +311,13 @@
           <div class="metric"><div class="val" id="dur-loud">0.0s</div><div class="lbl">Duration</div></div>
           <div class="metric"><div class="val" id="res-loud">0</div><div class="lbl">Resonance</div></div>
         </div>
-        <p class="caption" id="cap-loud">Blinding at the center. Spent by the time it reaches the edge.</p>
+        <p class="caption" id="cap-loud">All amplitude, little impact — a blinding flash that barely moves anyone.</p>
       </section>
 
       <section class="pond ripple" id="pond-ripple">
         <div class="pond-head">
           <div class="pond-name">The Ripple</div>
-          <div class="pond-tag">many relays<br>small amplitude</div>
+          <div class="pond-tag">low amplitude<br>high impact</div>
         </div>
         <div class="stage"><canvas id="c-ripple"></canvas></div>
         <div class="metrics">
@@ -325,7 +325,7 @@
           <div class="metric"><div class="val" id="dur-ripple">0.0s</div><div class="lbl">Duration</div></div>
           <div class="metric"><div class="val" id="res-ripple">0</div><div class="lbl">Resonance</div></div>
         </div>
-        <p class="caption" id="cap-ripple">Faint at first — but every node it touches becomes a new source.</p>
+        <p class="caption" id="cap-ripple">Barely a stir — but each touch moves the next, and moved nodes stay primed.</p>
       </section>
     </div>
 
@@ -336,11 +336,12 @@
 
     <div class="coda">
       <p>
-        Amplitude is spent the moment it's released. <em>Resonance</em> is shared —
-        and what is shared gets carried, renewed, and passed on. You don't have to be
-        the loudest thing in the room. You have to move the one next to you.
+        Amplitude is spent the moment it's released. <em>Impact</em> is what moves the
+        next person — and a network that has been moved stays primed to move again.
+        You don't have to be the loudest thing in the room. You have to change the one
+        next to you.
       </p>
-      <div class="sig">reach · duration · resonance</div>
+      <div class="sig">amplitude · impact · feedback</div>
     </div>
   </div>
 
@@ -394,24 +395,41 @@
   const NET = buildNetwork();
 
   // ---- tunable physics ----
+  // Amplitude and IMPACT are separate channels.
+  //   amplitude = how loud/big the signal is  -> makes the visible wave, burns off fast
+  //   impact    = how much it MOVES a receiver -> changes their lasting state, carries far
+  // High amplitude + low impact  = a blinding flash that barely moves anyone -> burns out.
+  // Low  amplitude + high impact = a quiet nudge that changes the next person -> compounds.
   const C          = 540;   // wavefront speed (logical units / s)
   const RING_W     = 34;    // wavefront thickness
-  const AMP_DECAY  = 3.5;   // how fast a single front spends itself (age-based)
   const GEO        = 0.0018;// geometric spreading with radius
-  const INJECT     = 7.0;   // front strength -> node energy
-  const GLOW_DECAY = 2.1;   // how fast a node's glow fades
-  const SAT        = 0.12;  // receiver saturation: how much of ONE input a node can take.
-                            // A single huge front saturates near SAT (wasted amplitude);
-                            // many small fronts each stay linear and SUM past it.
-  const ACTIVE     = 0.05;  // "this node has been reached"
-  const FIRE_TH    = 0.035; // ripple: energy needed to relay onward
-  const REARM      = 0.02;  // ripple: re-arm to fire again below this
-  const REFRAC     = 0.28;  // ripple: min seconds between a node's fires
-  const MAX_FIRES  = 16;    // safety ceiling; fatigue ends the ring-down well before this
-  const FATIGUE    = 0.9;   // each successive relay is a little weaker -> damped resonance
-  const E_LOUD     = 1.0;   // the one giant stone
-  const E_RIPPLE   = 0.26;  // each gentle touch (renewed, and echoed back, every hop)
-  const QUIET      = 0.4;   // seconds of silence before "duration" freezes
+
+  const AMP_DECAY  = 3.6;   // amplitude spends itself quickly with age/distance
+  const IMP_DECAY  = 0.85;  // impact fades slowly — it is the part that reaches
+
+  const INJECT     = 6.0;   // drive into a node's activation (its visible response)
+  const W_AMP      = 1.0;   // how much raw amplitude stirs a node (loud but shallow)
+  const W_IMP      = 1.25;  // how much impact stirs a node (quiet but deep)
+  const GLOW_DECAY = 2.0;   // activation fades fast — the moment passes
+
+  // Feedback: being moved leaves a node MORE receptive. When it recovers it is
+  // primed, so the next ripple lands harder — the memory that makes small,
+  // high-impact signals persist and compound instead of dying out.
+  const PRIME      = 1.7;   // how strongly impact sensitises a node
+  const SENS_DECAY = 0.45;  // priming fades slowly (~1.5s half-life): lingering readiness
+  const SENS_MAX   = 3.2;   // ceiling so the feedback loop can't run away
+
+  const ACTIVE     = 0.11;  // activation that counts as "reached"
+  const RES_CAP    = 2.5;   // cap each node's per-frame resonance so feedback stays legible
+  const FIRE_TH    = 0.16;  // ripple: activation needed to pass it on
+  const REARM      = 0.05;  // ripple: recovered enough to be moved again
+  const REFRAC     = 0.26;  // ripple: min seconds between a node's relays
+  const MAX_FIRES  = 40;    // high safety ceiling; feedback governs the real length
+
+  const LOUD_AMP = 1.0,  LOUD_IMP = 0.06;   // the one giant stone: all amplitude, no depth
+  const RIP_AMP  = 0.20, RIP_IMP  = 0.80;   // each gentle touch: faint, but it lands deep
+
+  const QUIET      = 0.45;  // seconds of silence before "duration" freezes
 
   class Sim {
     constructor(canvas, mode) {
@@ -437,10 +455,10 @@
     }
 
     reset() {
-      this.nodes = NET.nodes.map(() => ({ e: 0, peak: 0, armed: true, last: -99, fires: 0 }));
+      // a = activation (glow, fast decay); s = sensitivity (priming, slow decay, base 1)
+      this.nodes = NET.nodes.map(() => ({ a: 0, peak: 0, s: 1, armed: true, last: -99, fires: 0 }));
       this.rings = [];
       this.t = 0;
-      this.startT = 0;
       this.lastActive = 0;
       this.reach = 0;
       this.resonance = 0;
@@ -451,25 +469,28 @@
     start() {
       this.reset();
       this.running = true;
-      this.emit(NET.src, this.mode === "loud" ? E_LOUD : E_RIPPLE);
+      if (this.mode === "loud") this.emit(NET.src, LOUD_AMP, LOUD_IMP);
+      else                      this.emit(NET.src, RIP_AMP,  RIP_IMP);
     }
 
-    emit(i, energy) {
+    emit(i, amp, impact) {
       const n = NET.nodes[i];
-      this.rings.push({ x: n.x, y: n.y, born: this.t, e: energy });
+      this.rings.push({ x: n.x, y: n.y, born: this.t, amp, impact });
     }
 
     step(dt) {
       if (!this.running) return;
       this.t += dt;
 
-      // advance & retire rings (compute amp/age fresh — never trust a stale field,
-      // since relays can push new rings mid-loop below)
+      // advance & retire rings (compute strengths fresh — never trust a stale field,
+      // since relays can push new rings mid-loop below). A ring is kept while EITHER
+      // its amplitude or its (slower-fading) impact still matters.
       const alive = [];
       for (const ring of this.rings) {
         const age = this.t - ring.born;
-        const amp = ring.e * Math.exp(-AMP_DECAY * age);
-        if (amp > 0.006 && age < 6) alive.push(ring);
+        const amp = ring.amp * Math.exp(-AMP_DECAY * age);
+        const imp = ring.impact * Math.exp(-IMP_DECAY * age);
+        if ((amp > 0.006 || imp > 0.01) && age < 9) alive.push(ring);
       }
       this.rings = alive;
 
@@ -477,16 +498,15 @@
       // relays into existence this frame will only act on the NEXT frame.
       const active = this.rings.slice();
       let anyRing = active.length > 0;
-      let totalGlow = 0;
+      let totalGlow = 0, totalLit = 0;
 
       for (let i = 0; i < this.nodes.length; i++) {
         const nd = this.nodes[i];
         const p = NET.nodes[i];
-        // energy delivered by every passing front this frame
-        let rate = 0;
+        // accumulate the two channels separately from every passing front
+        let ampHere = 0, impHere = 0;
         for (const ring of active) {
           const age = this.t - ring.born;
-          const amp = ring.e * Math.exp(-AMP_DECAY * age);
           const r = C * age;
           const dx = p.x - ring.x, dy = p.y - ring.y;
           const d = Math.hypot(dx, dy);
@@ -494,39 +514,45 @@
           const band = Math.exp(-(df*df) / (2*RING_W*RING_W));
           if (band < 0.004) continue;
           const geo = 1 / (1 + d * GEO);
-          // receiver response: each input is saturated on its own (one giant
-          // front converts poorly), but separate inputs SUM (many small ones win)
-          const input = amp * geo;
-          const felt = input / (1 + input / SAT);
-          rate += felt * band;
+          const k = band * geo;
+          ampHere += ring.amp    * Math.exp(-AMP_DECAY * age) * k;   // loud, shallow, fades
+          impHere += ring.impact * Math.exp(-IMP_DECAY * age) * k;   // quiet, deep, carries
         }
-        nd.e += rate * INJECT * dt;
-        nd.e *= Math.exp(-GLOW_DECAY * dt);
-        if (nd.e > nd.peak) nd.peak = nd.e;
 
-        // the ripple: a touched node becomes a new source, in every direction —
-        // including back the way the wave came, so echoes return home and set out
-        // again. Each relay fatigues slightly, so the network rings down instead
-        // of exploding: a damped resonance, not a one-way sweep.
+        // activation rises from both channels — but impact is amplified by how
+        // primed this node already is (a receptive node is moved more).
+        nd.a += (ampHere * W_AMP + impHere * W_IMP * nd.s) * INJECT * dt;
+        nd.a *= Math.exp(-GLOW_DECAY * dt);
+        if (nd.a > nd.peak) nd.peak = nd.a;
+
+        // priming / feedback: impact leaves lasting readiness; it fades slowly,
+        // so a node that was moved recovers MORE receptive than it started.
+        nd.s += impHere * PRIME * dt;
+        nd.s = 1 + (nd.s - 1) * Math.exp(-SENS_DECAY * dt);
+        if (nd.s > SENS_MAX) nd.s = SENS_MAX;
+
+        // the ripple: a moved node passes it on in every direction — including back
+        // the way it came, so echoes return home and set out again. No artificial
+        // damping: the ring-down is governed by impact loss vs. priming gain.
         if (this.mode === "ripple") {
-          if (nd.armed && nd.e > FIRE_TH && nd.fires < MAX_FIRES && (this.t - nd.last) > REFRAC) {
+          if (nd.armed && nd.a > FIRE_TH && nd.fires < MAX_FIRES && (this.t - nd.last) > REFRAC) {
             nd.armed = false;
             nd.last = this.t;
-            const emitE = E_RIPPLE * Math.pow(FATIGUE, nd.fires);
             nd.fires++;
-            for (const j of NET.adj[i]) this.emit(j, emitE);
+            for (const j of NET.adj[i]) this.emit(j, RIP_AMP, RIP_IMP);
           }
-          if (nd.e < REARM) nd.armed = true;
+          if (nd.a < REARM) nd.armed = true;   // recovered -> primed to be moved again
         }
 
-        totalGlow += nd.e;
+        totalGlow += nd.a;
+        totalLit  += Math.min(nd.a, RES_CAP);   // capped so runaway feedback stays readable
       }
 
       // metrics
       let reached = 0;
       for (const nd of this.nodes) if (nd.peak > ACTIVE) reached++;
       this.reach = reached / this.nodes.length;
-      this.resonance += totalGlow * dt;
+      this.resonance += totalLit * dt;
 
       if (anyRing || totalGlow > 0.15) this.lastActive = this.t;
       if (!this.done && (this.t - this.lastActive) > QUIET && this.t > 0.6) {
@@ -543,7 +569,7 @@
       ctx.setTransform(s, 0, 0, s, 0, 0);
       ctx.clearRect(0, 0, W, H);
       this.drawEdges(0.05);
-      for (let i = 0; i < NET.nodes.length; i++) this.drawNode(i, 0);
+      for (let i = 0; i < NET.nodes.length; i++) this.drawNode(i, 0, 1);
     }
 
     drawEdges(alpha) {
@@ -566,8 +592,21 @@
         : `rgba(80,225,215,${a})`;
     }
 
-    drawNode(i, glow) {
+    drawNode(i, glow, sens) {
       const ctx = this.ctx, p = NET.nodes[i];
+      // priming halo: how receptive this node has become (its memory of being moved).
+      // Persists after the glow fades, so you can see the network stay primed.
+      const prime = (sens || 1) - 1;
+      if (prime > 0.02) {
+        const pr = 5 + prime * 13;
+        const pg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pr);
+        pg.addColorStop(0, this.col(Math.min(0.5, prime * 0.32)));
+        pg.addColorStop(1, this.col(0));
+        ctx.fillStyle = pg;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, pr, 0, Math.PI*2);
+        ctx.fill();
+      }
       // resting dot
       ctx.beginPath();
       ctx.fillStyle = "rgba(150,190,200,0.28)";
@@ -602,12 +641,13 @@
       this.drawEdges(0.055);
 
       ctx.globalCompositeOperation = "lighter";
-      // wavefronts
+      // wavefronts — brightness is AMPLITUDE (loud rings blaze, ripples are faint)
       for (const ring of this.rings) {
         const age = this.t - ring.born;
         const r = C * age;
         if (r < 1) continue;
-        const amp = ring.e * Math.exp(-AMP_DECAY * age);
+        const amp = ring.amp * Math.exp(-AMP_DECAY * age);
+        if (amp < 0.01) continue;
         ctx.beginPath();
         ctx.strokeStyle = this.col(Math.min(0.9, amp * 1.5));
         ctx.lineWidth = 2.2;
@@ -615,7 +655,10 @@
         ctx.stroke();
       }
       // nodes
-      for (let i = 0; i < this.nodes.length; i++) this.drawNode(i, this.nodes[i].e);
+      for (let i = 0; i < this.nodes.length; i++) {
+        const nd = this.nodes[i];
+        this.drawNode(i, nd.a, nd.s);
+      }
       ctx.globalCompositeOperation = "source-over";
     }
   }
@@ -649,8 +692,10 @@
     res.classList.toggle("hot", hot);
   }
 
-  const CAP_LOUD_DONE   = "One overwhelming push. It saturates whoever's nearest, and the far shore never feels it at all.";
-  const CAP_RIPPLE_DONE = "Small enough to land everywhere — echoes returned, re-excited, and set out again. The network kept ringing.";
+  const CAP_LOUD_START   = "All amplitude, little impact — a blinding flash that barely moves anyone.";
+  const CAP_RIPPLE_START = "Barely a stir — but each touch moves the next, and moved nodes stay primed.";
+  const CAP_LOUD_DONE    = "Maximum amplitude, minimum impact. It overwhelmed the nearest few and burned out.";
+  const CAP_RIPPLE_DONE  = "Low amplitude, high impact. Feedback kept priming the network — it reached everyone and rang on.";
 
   let last = performance.now();
   function frame(now) {
@@ -676,15 +721,15 @@
   }
 
   function playBoth() {
-    el.capL.textContent = "Blinding at the center. Spent by the time it reaches the edge.";
-    el.capR.textContent = "Faint at first — but every node it touches becomes a new source.";
+    el.capL.textContent = CAP_LOUD_START;
+    el.capR.textContent = CAP_RIPPLE_START;
     loud.start();
     ripple.start();
   }
 
   el.play.addEventListener("click", playBoth);
-  el.pondL.querySelector(".stage").addEventListener("click", () => { el.capL.textContent = "Blinding at the center. Spent by the time it reaches the edge."; loud.start(); });
-  el.pondR.querySelector(".stage").addEventListener("click", () => { el.capR.textContent = "Faint at first — but every node it touches becomes a new source."; ripple.start(); });
+  el.pondL.querySelector(".stage").addEventListener("click", () => { el.capL.textContent = CAP_LOUD_START; loud.start(); });
+  el.pondR.querySelector(".stage").addEventListener("click", () => { el.capR.textContent = CAP_RIPPLE_START; ripple.start(); });
 
   requestAnimationFrame(frame);
 
