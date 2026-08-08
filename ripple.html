@@ -394,49 +394,66 @@
 
   const NET = buildNetwork();
 
-  // ---- tunable physics ----
-  // Amplitude and IMPACT are separate channels.
-  //   amplitude = how loud/big the signal is  -> makes the visible wave, burns off fast
-  //   impact    = how much it MOVES a receiver -> changes their lasting state, carries far
-  // High amplitude + low impact  = a blinding flash that barely moves anyone -> burns out.
-  // Low  amplitude + high impact = a quiet nudge that changes the next person -> compounds.
-  const C          = 540;   // wavefront speed (logical units / s)
-  const RING_W     = 34;    // wavefront thickness
-  const GEO        = 0.0018;// geometric spreading with radius
+  // ---- water: a real 2-D wave field (a ripple tank), shaded like a lit surface ----
+  // Both ponds are genuine wave simulations. What differs is the MEDIUM:
+  //   Loud   -> passive water, heavy loss. One huge stone: a grand splash that dies.
+  //   Ripple -> a LIVING surface. A passing wave can move a person; a moved person makes
+  //             their own small wave (relay), and having been moved leaves them PRIMED to
+  //             respond again. Low loss + that feedback = ripples that linger and resonate.
+  const GW = 240, GH = 154;           // simulation grid (aspect ~1.56, matches the stage)
+  const CELLS = GW * GH;
+  const DAMP_LOUD   = 0.9852;         // heavy loss: the big splash spreads thin and calms
+  const DAMP_RIPPLE = 0.9976;         // low loss: ripples persist, cross, and interfere
+  const SUBSTEPS    = 2;              // physics iterations per frame (crisper wavefronts)
+  const HCLAMP      = 1300;           // safety clamp on surface height
 
-  const AMP_DECAY  = 3.6;   // amplitude spends itself quickly with age/distance
-  const IMP_DECAY  = 0.85;  // impact fades slowly — it is the part that reaches
+  const DROP_RAD    = 4;              // stone radius, in cells
+  const AMP_LOUD    = 680;            // the one giant stone (all amplitude)
+  const AMP_RIP     = 50;             // each gentle touch (faint, but it lands)
+  const EMIT_STRIDE = 2;              // use every Nth person as a source: fewer, cleaner rings
 
-  const INJECT     = 6.0;   // drive into a node's activation (its visible response)
-  const W_AMP      = 1.0;   // how much raw amplitude stirs a node (loud but shallow)
-  const W_IMP      = 1.25;  // how much impact stirs a node (quiet but deep)
-  const GLOW_DECAY = 2.0;   // activation fades fast — the moment passes
+  // emitters = the people, seeded across the surface (only the ripple's is alive)
+  const EX_THRESH   = 12;             // wave height that moves an emitter to relay
+  const EX_REARM    = 4;              // settled below this -> ready to be moved again
+  const EX_REFRAC   = 0.48;           // min seconds between an emitter's relays
+  const PRIME_INC   = 0.6;            // readiness gained each time it is moved
+  const PRIME_DECAY = 0.55;           // priming fades slowly (lingering readiness)
+  const PRIME_MAX   = 1.0;            // ceiling so the feedback can't run away
+  const PRIME_EASE  = 0.7;            // a fully primed emitter responds at 30% of THRESH
 
-  // Feedback: being moved leaves a node MORE receptive. When it recovers it is
-  // primed, so the next ripple lands harder — the memory that makes small,
-  // high-impact signals persist and compound instead of dying out.
-  const PRIME      = 1.7;   // how strongly impact sensitises a node
-  const SENS_DECAY = 0.45;  // priming fades slowly (~1.5s half-life): lingering readiness
-  const SENS_MAX   = 3.2;   // ceiling so the feedback loop can't run away
-
-  const ACTIVE     = 0.11;  // activation that counts as "reached"
-  const RES_CAP    = 2.5;   // cap each node's per-frame resonance so feedback stays legible
-  const FIRE_TH    = 0.16;  // ripple: activation needed to pass it on
-  const REARM      = 0.05;  // ripple: recovered enough to be moved again
-  const REFRAC     = 0.26;  // ripple: min seconds between a node's relays
-  const MAX_FIRES  = 40;    // high safety ceiling; feedback governs the real length
-
-  const LOUD_AMP = 1.0,  LOUD_IMP = 0.06;   // the one giant stone: all amplitude, no depth
-  const RIP_AMP  = 0.20, RIP_IMP  = 0.80;   // each gentle touch: faint, but it lands deep
-
-  const QUIET      = 0.45;  // seconds of silence before "duration" freezes
+  const REACH_EPS   = 50;             // |height| that marks a cell as meaningfully "reached"
+  const ACT_QUIET   = 3.2;            // mean |height| below which the surface is "still"
+  const QUIET       = 0.5;            // seconds of stillness before "duration" freezes
 
   class Sim {
     constructor(canvas, mode) {
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
-      this.mode = mode;            // "loud" | "ripple"
-      this.scale = 1;
+      this.mode = mode;                       // "loud" | "ripple"
+      this.damp = mode === "loud" ? DAMP_LOUD : DAMP_RIPPLE;
+
+      // the water: two height buffers + a "has been reached" mask
+      this.cur  = new Float32Array(CELLS);
+      this.prev = new Float32Array(CELLS);
+      this.touched = new Uint8Array(CELLS);
+
+      // offscreen surface we shade a pixel at a time, then scale up smoothly
+      this.off = document.createElement("canvas");
+      this.off.width = GW; this.off.height = GH;
+      this.octx = this.off.getContext("2d");
+      this.img = this.octx.createImageData(GW, GH);
+
+      // emitters (the people) mapped onto the grid; the source drop sits at centre.
+      // Use a subset so individual ripple rings stay legible instead of blurring together.
+      this.emitters = NET.nodes.filter((_, k) => k % EMIT_STRIDE === 0).map(n => {
+        const gx = Math.round(n.x / W * (GW - 1));
+        const gy = Math.round(n.y / H * (GH - 1));
+        return { x: gx, y: gy, idx: gy * GW + gx, armed: true, last: -99, prime: 0 };
+      });
+      const src = NET.nodes[NET.src];
+      this.srcX = Math.round(src.x / W * (GW - 1));
+      this.srcY = Math.round(src.y / H * (GH - 1));
+
       this.setSize();
       this.reset();
       new ResizeObserver(() => this.setSize()).observe(canvas);
@@ -450,18 +467,19 @@
       if (this.canvas.width !== w || this.canvas.height !== h) {
         this.canvas.width = w; this.canvas.height = h;
       }
-      this.scale = w / W;
-      this.paintStatic();
+      this.render();
     }
 
     reset() {
-      // a = activation (glow, fast decay); s = sensitivity (priming, slow decay, base 1)
-      this.nodes = NET.nodes.map(() => ({ a: 0, peak: 0, s: 1, armed: true, last: -99, fires: 0 }));
-      this.rings = [];
+      this.cur.fill(0); this.prev.fill(0); this.touched.fill(0);
+      for (const e of this.emitters) { e.armed = true; e.last = -99; e.prime = 0; }
       this.t = 0;
       this.lastActive = 0;
+      this.activity = 0;
+      this.reachCount = 0;
       this.reach = 0;
       this.resonance = 0;
+      this.quiet = 0;
       this.running = false;
       this.done = false;
     }
@@ -469,198 +487,124 @@
     start() {
       this.reset();
       this.running = true;
-      if (this.mode === "loud") this.emit(NET.src, LOUD_AMP, LOUD_IMP);
-      else                      this.emit(NET.src, RIP_AMP,  RIP_IMP);
+      if (this.mode === "loud") this.drop(this.srcX, this.srcY, AMP_LOUD, DROP_RAD + 3);
+      else                      this.drop(this.srcX, this.srcY, AMP_RIP, DROP_RAD);
     }
 
-    emit(i, amp, impact) {
-      const n = NET.nodes[i];
-      this.rings.push({ x: n.x, y: n.y, born: this.t, amp, impact });
+    // add a soft, rounded stone-impact to the surface
+    drop(cx, cy, amp, rad) {
+      const R = rad || DROP_RAD;
+      for (let dy = -R; dy <= R; dy++) {
+        const gy = cy + dy; if (gy < 1 || gy >= GH - 1) continue;
+        for (let dx = -R; dx <= R; dx++) {
+          const gx = cx + dx; if (gx < 1 || gx >= GW - 1) continue;
+          const q = Math.sqrt(dx*dx + dy*dy) / R; if (q > 1) continue;
+          this.cur[gy*GW + gx] += amp * 0.5 * (1 + Math.cos(Math.PI * q));
+        }
+      }
     }
 
     step(dt) {
       if (!this.running) return;
       this.t += dt;
 
-      // advance & retire rings (compute strengths fresh — never trust a stale field,
-      // since relays can push new rings mid-loop below). A ring is kept while EITHER
-      // its amplitude or its (slower-fading) impact still matters.
-      const alive = [];
-      for (const ring of this.rings) {
-        const age = this.t - ring.born;
-        const amp = ring.amp * Math.exp(-AMP_DECAY * age);
-        const imp = ring.impact * Math.exp(-IMP_DECAY * age);
-        if ((amp > 0.006 || imp > 0.01) && age < 9) alive.push(ring);
-      }
-      this.rings = alive;
+      for (let s = 0; s < SUBSTEPS; s++) this.physics();
+      if (this.mode === "ripple") this.relays(dt);
+      this.measure(dt);
 
-      // snapshot the rings that exist at the start of this step; any ring a node
-      // relays into existence this frame will only act on the NEXT frame.
-      const active = this.rings.slice();
-      let anyRing = active.length > 0;
-      let totalGlow = 0, totalLit = 0;
+      if (this.activity > ACT_QUIET) this.lastActive = this.t;
+      if (this.t > 0.6 && (this.t - this.lastActive) > QUIET) this.done = true;
+      // once it has truly gone still, calm the surface and stop redrawing
+      if (this.done && this.activity < ACT_QUIET * 0.25) {
+        this.quiet += dt;
+        if (this.quiet > 1.4) { this.cur.fill(0); this.prev.fill(0); this.render(); this.running = false; }
+      } else this.quiet = 0;
+    }
 
-      for (let i = 0; i < this.nodes.length; i++) {
-        const nd = this.nodes[i];
-        const p = NET.nodes[i];
-        // accumulate the two channels separately from every passing front
-        let ampHere = 0, impHere = 0;
-        for (const ring of active) {
-          const age = this.t - ring.born;
-          const r = C * age;
-          const dx = p.x - ring.x, dy = p.y - ring.y;
-          const d = Math.hypot(dx, dy);
-          const df = d - r;                          // distance from the wavefront
-          const band = Math.exp(-(df*df) / (2*RING_W*RING_W));
-          if (band < 0.004) continue;
-          const geo = 1 / (1 + d * GEO);
-          const k = band * geo;
-          ampHere += ring.amp    * Math.exp(-AMP_DECAY * age) * k;   // loud, shallow, fades
-          impHere += ring.impact * Math.exp(-IMP_DECAY * age) * k;   // quiet, deep, carries
+    // one step of the wave equation: (avg of 4 neighbours) - previous, then lose a little
+    physics() {
+      const cur = this.cur, prev = this.prev, damp = this.damp;
+      for (let y = 1; y < GH - 1; y++) {
+        let i = y * GW + 1;
+        for (let x = 1; x < GW - 1; x++, i++) {
+          let v = ((cur[i-1] + cur[i+1] + cur[i-GW] + cur[i+GW]) * 0.5 - prev[i]) * damp;
+          if (v > HCLAMP) v = HCLAMP; else if (v < -HCLAMP) v = -HCLAMP;
+          prev[i] = v;                        // write next frame into the old buffer
         }
+      }
+      this.cur = prev; this.prev = cur;       // swap (boundaries stay 0 -> walls reflect)
+    }
 
-        // activation rises from both channels — but impact is amplified by how
-        // primed this node already is (a receptive node is moved more).
-        nd.a += (ampHere * W_AMP + impHere * W_IMP * nd.s) * INJECT * dt;
-        nd.a *= Math.exp(-GLOW_DECAY * dt);
-        if (nd.a > nd.peak) nd.peak = nd.a;
-
-        // priming / feedback: impact leaves lasting readiness; it fades slowly,
-        // so a node that was moved recovers MORE receptive than it started.
-        nd.s += impHere * PRIME * dt;
-        nd.s = 1 + (nd.s - 1) * Math.exp(-SENS_DECAY * dt);
-        if (nd.s > SENS_MAX) nd.s = SENS_MAX;
-
-        // the ripple: a moved node passes it on in every direction — including back
-        // the way it came, so echoes return home and set out again. No artificial
-        // damping: the ring-down is governed by impact loss vs. priming gain.
-        if (this.mode === "ripple") {
-          if (nd.armed && nd.a > FIRE_TH && nd.fires < MAX_FIRES && (this.t - nd.last) > REFRAC) {
-            nd.armed = false;
-            nd.last = this.t;
-            nd.fires++;
-            for (const j of NET.adj[i]) this.emit(j, RIP_AMP, RIP_IMP);
-          }
-          if (nd.a < REARM) nd.armed = true;   // recovered -> primed to be moved again
+    // the living surface: a passing wave moves an emitter; a moved emitter makes its
+    // own small wave, in phase with the local surface so it reinforces (resonates).
+    relays(dt) {
+      for (const e of this.emitters) {
+        const h = this.cur[e.idx];
+        const mag = h < 0 ? -h : h;
+        const thr = EX_THRESH * (1 - PRIME_EASE * e.prime);
+        if (e.armed && mag > thr && (this.t - e.last) > EX_REFRAC) {
+          e.armed = false;
+          e.last = this.t;
+          e.prime = Math.min(PRIME_MAX, e.prime + PRIME_INC);   // being moved primes it
+          this.drop(e.x, e.y, AMP_RIP * (h >= 0 ? 1 : -1), DROP_RAD);
         }
-
-        totalGlow += nd.a;
-        totalLit  += Math.min(nd.a, RES_CAP);   // capped so runaway feedback stays readable
+        if (mag < EX_REARM) e.armed = true;    // recovered -> primed to be moved again
+        e.prime *= Math.exp(-PRIME_DECAY * dt);
       }
+    }
 
-      // metrics
-      let reached = 0;
-      for (const nd of this.nodes) if (nd.peak > ACTIVE) reached++;
-      this.reach = reached / this.nodes.length;
-      this.resonance += totalLit * dt;
-
-      if (anyRing || totalGlow > 0.15) this.lastActive = this.t;
-      if (!this.done && (this.t - this.lastActive) > QUIET && this.t > 0.6) {
-        this.done = true;
+    measure(dt) {
+      const cur = this.cur, touched = this.touched;
+      let act = 0, newly = 0;
+      for (let i = 0; i < CELLS; i++) {
+        const a = cur[i], aa = a < 0 ? -a : a;
+        act += aa;
+        if (aa > REACH_EPS && touched[i] === 0) { touched[i] = 1; newly++; }
       }
+      this.reachCount += newly;
+      this.reach = this.reachCount / CELLS;
+      this.activity = act / CELLS;
+      this.resonance += this.activity * dt;
     }
 
     get duration() { return Math.max(0, this.lastActive); }
 
-    // ---------- rendering ----------
-    paintStatic() {
-      // draw the dormant network once (also the resting state)
-      const ctx = this.ctx, s = this.scale;
-      ctx.setTransform(s, 0, 0, s, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      this.drawEdges(0.05);
-      for (let i = 0; i < NET.nodes.length; i++) this.drawNode(i, 0, 1);
-    }
-
-    drawEdges(alpha) {
-      const ctx = this.ctx;
-      ctx.lineWidth = 0.6;
-      ctx.strokeStyle = `rgba(120,180,190,${alpha})`;
-      ctx.beginPath();
-      for (let i = 0; i < NET.adj.length; i++) {
-        const a = NET.nodes[i];
-        for (const j of NET.adj[i]) {
-          if (j > i) { ctx.moveTo(a.x, a.y); ctx.lineTo(NET.nodes[j].x, NET.nodes[j].y); }
+    // ---------- rendering: shade the height field like lit water ----------
+    render() {
+      const cur = this.cur, d = this.img.data;
+      const warm = this.mode === "loud";
+      // deep base water, and the colour that catches the light
+      const bR = warm ? 15 : 6,   bG = warm ? 25 : 26,  bB = warm ? 31 : 37;
+      const hR = warm ? 255 : 118, hG = warm ? 170 : 240, hB = warm ? 96 : 230;
+      const LX = 0.60, LY = 0.42;              // light from the upper-left
+      let p = 0;
+      for (let y = 0; y < GH; y++) {
+        for (let x = 0; x < GW; x++) {
+          const i = y * GW + x;
+          const l  = x > 0      ? cur[i-1]  : cur[i];
+          const r  = x < GW - 1 ? cur[i+1]  : cur[i];
+          const u  = y > 0      ? cur[i-GW] : cur[i];
+          const dn = y < GH - 1 ? cur[i+GW] : cur[i];
+          const s = (r - l) * LX + (dn - u) * LY;   // slope toward the light (refraction)
+          let lum = 0.20 + s * 0.011 + cur[i] * 0.0006;
+          if (lum < 0) lum = 0;
+          let spec = s > 0 ? s * 0.010 : 0; spec *= spec;   // sharp glints on steep faces
+          let rr = bR + lum * (hR - bR) + spec * hR;
+          let gg = bG + lum * (hG - bG) + spec * hG;
+          let bb = bB + lum * (hB - bB) + spec * hB;
+          d[p++] = rr > 255 ? 255 : rr;
+          d[p++] = gg > 255 ? 255 : gg;
+          d[p++] = bb > 255 ? 255 : bb;
+          d[p++] = 255;
         }
       }
-      ctx.stroke();
+      this.octx.putImageData(this.img, 0, 0);
+      const ctx = this.ctx;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(this.off, 0, 0, this.canvas.width, this.canvas.height);
     }
 
-    col(a) {
-      return this.mode === "loud"
-        ? `rgba(255,150,70,${a})`
-        : `rgba(80,225,215,${a})`;
-    }
-
-    drawNode(i, glow, sens) {
-      const ctx = this.ctx, p = NET.nodes[i];
-      // priming halo: how receptive this node has become (its memory of being moved).
-      // Persists after the glow fades, so you can see the network stay primed.
-      const prime = (sens || 1) - 1;
-      if (prime > 0.02) {
-        const pr = 5 + prime * 13;
-        const pg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pr);
-        pg.addColorStop(0, this.col(Math.min(0.5, prime * 0.32)));
-        pg.addColorStop(1, this.col(0));
-        ctx.fillStyle = pg;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, pr, 0, Math.PI*2);
-        ctx.fill();
-      }
-      // resting dot
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(150,190,200,0.28)";
-      ctx.arc(p.x, p.y, 2.4, 0, Math.PI*2);
-      ctx.fill();
-      if (!(glow > 0.01)) return;              // also bails on NaN, never feeds a bad radius
-      const g = Math.min(1, glow);
-      const rad = 6 + g * 42;
-      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
-      grd.addColorStop(0, this.col(0.9 * g));
-      grd.addColorStop(0.4, this.col(0.32 * g));
-      grd.addColorStop(1, this.col(0));
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, rad, 0, Math.PI*2);
-      ctx.fill();
-      // bright core
-      ctx.beginPath();
-      ctx.fillStyle = this.col(Math.min(1, 0.5 + g));
-      ctx.arc(p.x, p.y, 2 + g*3, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    draw() {
-      const ctx = this.ctx, s = this.scale;
-      ctx.setTransform(s, 0, 0, s, 0, 0);
-      // fade previous frame -> luminous trails
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(5,20,27,0.30)";
-      ctx.fillRect(0, 0, W, H);
-
-      this.drawEdges(0.055);
-
-      ctx.globalCompositeOperation = "lighter";
-      // wavefronts — brightness is AMPLITUDE (loud rings blaze, ripples are faint)
-      for (const ring of this.rings) {
-        const age = this.t - ring.born;
-        const r = C * age;
-        if (r < 1) continue;
-        const amp = ring.amp * Math.exp(-AMP_DECAY * age);
-        if (amp < 0.01) continue;
-        ctx.beginPath();
-        ctx.strokeStyle = this.col(Math.min(0.9, amp * 1.5));
-        ctx.lineWidth = 2.2;
-        ctx.arc(ring.x, ring.y, r, 0, Math.PI*2);
-        ctx.stroke();
-      }
-      // nodes
-      for (let i = 0; i < this.nodes.length; i++) {
-        const nd = this.nodes[i];
-        this.drawNode(i, nd.a, nd.s);
-      }
-      ctx.globalCompositeOperation = "source-over";
-    }
+    draw() { this.render(); }
   }
 
   // ---------- wiring ----------
