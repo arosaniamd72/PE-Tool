@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ripple — small waves outlast the loud one</title>
+<style>
+  :root {
+    /* Committed dark-water world — painted explicitly, single-theme by design */
+    --abyss:   #04121a;
+    --deep:    #071e29;
+    --surface: #0a2733;
+    --line:    #123540;
+    --foam:    #eaf6f4;
+    --muted:   #7fa1a8;
+    --faint:   #46666e;
+
+    /* the loud one — a warm ember that spends itself */
+    --warm:    #ff8a3d;
+    --warm-lo: #b5541f;
+
+    /* the ripple — cool light that spreads and lasts */
+    --cool:    #45e0d3;
+    --cool-lo: #1f8f97;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans:  system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background:
+      radial-gradient(120% 90% at 50% -10%, #0a2b38 0%, var(--abyss) 55%, #020a0f 100%);
+    color: var(--foam);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem) 4rem;
+  }
+
+  .wrap { max-width: 1140px; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  header { text-align: center; margin-bottom: clamp(1.75rem, 4vw, 3rem); }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--cool);
+    opacity: 0.85;
+    margin-bottom: 1.1rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(1.9rem, 5.4vw, 3.5rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 auto 1.1rem;
+    max-width: 20ch;
+  }
+  h1 em {
+    font-style: italic;
+    color: var(--cool);
+    text-shadow: 0 0 26px rgba(69, 224, 211, 0.35);
+  }
+
+  .lede {
+    font-family: var(--serif);
+    font-size: clamp(1.02rem, 2.1vw, 1.28rem);
+    color: var(--muted);
+    max-width: 56ch;
+    margin: 0 auto;
+    text-wrap: pretty;
+  }
+
+  /* ---------- ponds ---------- */
+  .ponds {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(1rem, 2.5vw, 1.75rem);
+    margin-top: clamp(1.5rem, 4vw, 2.5rem);
+  }
+  @media (max-width: 760px) {
+    .ponds { grid-template-columns: 1fr; }
+  }
+
+  .pond {
+    background: linear-gradient(180deg, var(--deep), var(--abyss));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.9rem 0.9rem 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .pond::before {
+    /* signature rail — semantic, not decorative: which force is this pond */
+    content: "";
+    position: absolute; inset: 0 auto 0 0;
+    width: 3px;
+  }
+  .pond.loud::before   { background: linear-gradient(180deg, var(--warm), transparent); }
+  .pond.ripple::before { background: linear-gradient(180deg, var(--cool), transparent); }
+
+  .pond.leading { border-color: var(--cool-lo); }
+
+  .pond-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 0.75rem; margin-bottom: 0.7rem; padding-left: 0.4rem;
+  }
+  .pond-name {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.22rem;
+  }
+  .pond.loud   .pond-name { color: var(--warm); }
+  .pond.ripple .pond-name { color: var(--cool); }
+  .pond-tag {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    text-align: right;
+    line-height: 1.4;
+  }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1000 / 640;
+    border-radius: 9px;
+    overflow: hidden;
+    background:
+      radial-gradient(90% 120% at 50% 40%, #0c2f3d 0%, #061821 70%, #04121a 100%);
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- metrics ---------- */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+  }
+  .metric {
+    text-align: center;
+    padding: 0.5rem 0.35rem;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.018);
+    border: 1px solid var(--line);
+  }
+  .metric .val {
+    font-family: var(--mono);
+    font-size: clamp(1.15rem, 2.6vw, 1.55rem);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--foam);
+    transition: color 0.3s;
+  }
+  .pond.loud   .metric .val.hot { color: var(--warm); }
+  .pond.ripple .metric .val.hot { color: var(--cool); }
+  .metric .lbl {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.42rem;
+  }
+
+  .caption {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.85rem;
+    min-height: 2.6em;
+    padding: 0 0.4rem;
+    text-wrap: pretty;
+  }
+
+  /* ---------- controls ---------- */
+  .controls {
+    display: flex; justify-content: center; align-items: center;
+    gap: 0.9rem; flex-wrap: wrap;
+    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+  }
+  button.play {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--abyss);
+    background: var(--cool);
+    border: none;
+    padding: 0.85rem 1.8rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.25s, background 0.2s;
+    box-shadow: 0 0 0 rgba(69,224,211,0);
+  }
+  button.play:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 30px rgba(69, 224, 211, 0.35);
+  }
+  button.play:active { transform: translateY(0); }
+  button.play:focus-visible { outline: 2px solid var(--foam); outline-offset: 3px; }
+
+  .hint {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--faint);
+  }
+
+  /* ---------- closing ---------- */
+  .coda {
+    max-width: 60ch;
+    margin: clamp(3rem, 7vw, 5rem) auto 0;
+    text-align: center;
+    border-top: 1px solid var(--line);
+    padding-top: clamp(2rem, 5vw, 3rem);
+  }
+  .coda p {
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 2.6vw, 1.55rem);
+    line-height: 1.5;
+    text-wrap: pretty;
+    color: var(--foam);
+  }
+  .coda p em { font-style: italic; color: var(--cool); }
+  .coda .sig {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-top: 1.6rem;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">A study in propagation</div>
+      <h1>One loud voice fades. A <em>ripple</em> keeps moving.</h1>
+      <p class="lede">
+        Two ponds, the same network of people. On the left, a single node erupts
+        with everything it has. On the right, one small touch — passed gently from
+        neighbor to neighbor. Watch which one travels farther, and which one lasts.
+      </p>
+    </header>
+
+    <div class="ponds">
+      <section class="pond loud" id="pond-loud">
+        <div class="pond-head">
+          <div class="pond-name">The Loud One</div>
+          <div class="pond-tag">one source<br>massive amplitude</div>
+        </div>
+        <div class="stage"><canvas id="c-loud"></canvas></div>
+        <div class="metrics">
+          <div class="metric"><div class="val" id="reach-loud">0%</div><div class="lbl">Reach</div></div>
+          <div class="metric"><div class="val" id="dur-loud">0.0s</div><div class="lbl">Duration</div></div>
+          <div class="metric"><div class="val" id="res-loud">0</div><div class="lbl">Resonance</div></div>
+        </div>
+        <p class="caption" id="cap-loud">Blinding at the center. Spent by the time it reaches the edge.</p>
+      </section>
+
+      <section class="pond ripple" id="pond-ripple">
+        <div class="pond-head">
+          <div class="pond-name">The Ripple</div>
+          <div class="pond-tag">many relays<br>small amplitude</div>
+        </div>
+        <div class="stage"><canvas id="c-ripple"></canvas></div>
+        <div class="metrics">
+          <div class="metric"><div class="val" id="reach-ripple">0%</div><div class="lbl">Reach</div></div>
+          <div class="metric"><div class="val" id="dur-ripple">0.0s</div><div class="lbl">Duration</div></div>
+          <div class="metric"><div class="val" id="res-ripple">0</div><div class="lbl">Resonance</div></div>
+        </div>
+        <p class="caption" id="cap-ripple">Faint at first — but every node it touches becomes a new source.</p>
+      </section>
+    </div>
+
+    <div class="controls">
+      <button class="play" id="play">▶ Drop both stones</button>
+      <span class="hint" id="hint">or tap either pond to start it alone</span>
+    </div>
+
+    <div class="coda">
+      <p>
+        Amplitude is spent the moment it's released. <em>Resonance</em> is shared —
+        and what is shared gets carried, renewed, and passed on. You don't have to be
+        the loudest thing in the room. You have to move the one next to you.
+      </p>
+      <div class="sig">reach · duration · resonance</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---- logical world (fixed aspect so rings stay circular) ----
+  const W = 1000, H = 640;
+  const N = 92;
+
+  // ---- seeded layout, shared by both ponds so the race is fair ----
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+  function buildNetwork() {
+    const rnd = mulberry32(20260808);
+    const nodes = [];
+    const margin = 70;
+    // blue-noise-ish scatter via rejection
+    let guard = 0;
+    while (nodes.length < N && guard < 20000) {
+      guard++;
+      const x = margin + rnd() * (W - 2*margin);
+      const y = margin + rnd() * (H - 2*margin);
+      let ok = true;
+      for (const n of nodes) {
+        const dx = n.x - x, dy = n.y - y;
+        if (dx*dx + dy*dy < 62*62) { ok = false; break; }
+      }
+      if (ok) nodes.push({ x, y });
+    }
+    // proximity graph for the relay
+    const R = 150;
+    const adj = nodes.map(() => []);
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i+1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        if (dx*dx + dy*dy < R*R) { adj[i].push(j); adj[j].push(i); }
+      }
+    }
+    // source = node nearest the centre
+    let src = 0, best = Infinity;
+    for (let i = 0; i < nodes.length; i++) {
+      const dx = nodes[i].x - W/2, dy = nodes[i].y - H/2;
+      const d = dx*dx + dy*dy;
+      if (d < best) { best = d; src = i; }
+    }
+    return { nodes, adj, src };
+  }
+
+  const NET = buildNetwork();
+
+  // ---- tunable physics ----
+  const C          = 540;   // wavefront speed (logical units / s)
+  const RING_W     = 34;    // wavefront thickness
+  const AMP_DECAY  = 1.35;  // how fast a single front spends itself
+  const GEO        = 0.0018;// geometric spreading with radius
+  const INJECT     = 7.0;   // front energy -> node energy
+  const GLOW_DECAY = 2.3;   // how fast a node's glow fades
+  const ACTIVE     = 0.055; // "this node has been reached"
+  const FIRE_TH    = 0.05;  // ripple: energy needed to relay onward
+  const REARM      = 0.018; // ripple: re-arm below this
+  const REFRAC     = 0.32;  // ripple: min seconds between a node's fires
+  const MAX_FIRES  = 5;     // guarantees the cascade terminates
+  const E_LOUD     = 1.0;   // the one giant stone
+  const E_RIPPLE   = 0.24;  // each gentle touch (renewed every hop)
+  const QUIET      = 0.35;  // seconds of silence before "duration" freezes
+
+  class Sim {
+    constructor(canvas, mode) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.mode = mode;            // "loud" | "ripple"
+      this.scale = 1;
+      this.setSize();
+      this.reset();
+      new ResizeObserver(() => this.setSize()).observe(canvas);
+    }
+
+    setSize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const r = this.canvas.getBoundingClientRect();
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
+      if (this.canvas.width !== w || this.canvas.height !== h) {
+        this.canvas.width = w; this.canvas.height = h;
+      }
+      this.scale = w / W;
+      this.paintStatic();
+    }
+
+    reset() {
+      this.nodes = NET.nodes.map(() => ({ e: 0, peak: 0, armed: true, last: -99, fires: 0 }));
+      this.rings = [];
+      this.t = 0;
+      this.startT = 0;
+      this.lastActive = 0;
+      this.reach = 0;
+      this.resonance = 0;
+      this.running = false;
+      this.done = false;
+    }
+
+    start() {
+      this.reset();
+      this.running = true;
+      this.emit(NET.src, this.mode === "loud" ? E_LOUD : E_RIPPLE);
+    }
+
+    emit(i, energy) {
+      const n = NET.nodes[i];
+      this.rings.push({ x: n.x, y: n.y, born: this.t, e: energy });
+    }
+
+    step(dt) {
+      if (!this.running) return;
+      this.t += dt;
+
+      // advance & retire rings
+      const alive = [];
+      for (const ring of this.rings) {
+        const age = this.t - ring.born;
+        const amp = ring.e * Math.exp(-AMP_DECAY * age);
+        if (amp > 0.006 && age < 6) { ring.age = age; ring.amp = amp; alive.push(ring); }
+      }
+      this.rings = alive;
+
+      let anyRing = this.rings.length > 0;
+      let totalGlow = 0;
+
+      for (let i = 0; i < this.nodes.length; i++) {
+        const nd = this.nodes[i];
+        const p = NET.nodes[i];
+        // energy delivered by every passing front this frame
+        let rate = 0;
+        for (const ring of this.rings) {
+          const r = C * ring.age;
+          const dx = p.x - ring.x, dy = p.y - ring.y;
+          const d = Math.hypot(dx, dy);
+          const df = d - r;                          // distance from the wavefront
+          const band = Math.exp(-(df*df) / (2*RING_W*RING_W));
+          if (band < 0.004) continue;
+          const geo = 1 / (1 + d * GEO);
+          rate += ring.amp * band * geo;
+        }
+        nd.e += rate * INJECT * dt;
+        nd.e *= Math.exp(-GLOW_DECAY * dt);
+        if (nd.e > nd.peak) nd.peak = nd.e;
+
+        // the ripple: a touched node becomes a new source
+        if (this.mode === "ripple") {
+          if (nd.armed && nd.e > FIRE_TH && nd.fires < MAX_FIRES && (this.t - nd.last) > REFRAC) {
+            nd.armed = false;
+            nd.last = this.t;
+            nd.fires++;
+            for (const j of NET.adj[i]) this.emit(j, E_RIPPLE);
+          }
+          if (nd.e < REARM) nd.armed = true;
+        }
+
+        totalGlow += nd.e;
+      }
+
+      // metrics
+      let reached = 0;
+      for (const nd of this.nodes) if (nd.peak > ACTIVE) reached++;
+      this.reach = reached / this.nodes.length;
+      this.resonance += totalGlow * dt;
+
+      if (anyRing || totalGlow > 0.15) this.lastActive = this.t;
+      if (!this.done && (this.t - this.lastActive) > QUIET && this.t > 0.6) {
+        this.done = true;
+      }
+    }
+
+    get duration() { return Math.max(0, this.lastActive); }
+
+    // ---------- rendering ----------
+    paintStatic() {
+      // draw the dormant network once (also the resting state)
+      const ctx = this.ctx, s = this.scale;
+      ctx.setTransform(s, 0, 0, s, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      this.drawEdges(0.05);
+      for (let i = 0; i < NET.nodes.length; i++) this.drawNode(i, 0);
+    }
+
+    drawEdges(alpha) {
+      const ctx = this.ctx;
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = `rgba(120,180,190,${alpha})`;
+      ctx.beginPath();
+      for (let i = 0; i < NET.adj.length; i++) {
+        const a = NET.nodes[i];
+        for (const j of NET.adj[i]) {
+          if (j > i) { ctx.moveTo(a.x, a.y); ctx.lineTo(NET.nodes[j].x, NET.nodes[j].y); }
+        }
+      }
+      ctx.stroke();
+    }
+
+    col(a) {
+      return this.mode === "loud"
+        ? `rgba(255,150,70,${a})`
+        : `rgba(80,225,215,${a})`;
+    }
+
+    drawNode(i, glow) {
+      const ctx = this.ctx, p = NET.nodes[i];
+      // resting dot
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(150,190,200,0.28)";
+      ctx.arc(p.x, p.y, 2.4, 0, Math.PI*2);
+      ctx.fill();
+      if (glow <= 0.01) return;
+      const g = Math.min(1, glow);
+      const rad = 6 + g * 42;
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
+      grd.addColorStop(0, this.col(0.9 * g));
+      grd.addColorStop(0.4, this.col(0.32 * g));
+      grd.addColorStop(1, this.col(0));
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rad, 0, Math.PI*2);
+      ctx.fill();
+      // bright core
+      ctx.beginPath();
+      ctx.fillStyle = this.col(Math.min(1, 0.5 + g));
+      ctx.arc(p.x, p.y, 2 + g*3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    draw() {
+      const ctx = this.ctx, s = this.scale;
+      ctx.setTransform(s, 0, 0, s, 0, 0);
+      // fade previous frame -> luminous trails
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(5,20,27,0.30)";
+      ctx.fillRect(0, 0, W, H);
+
+      this.drawEdges(0.055);
+
+      ctx.globalCompositeOperation = "lighter";
+      // wavefronts
+      for (const ring of this.rings) {
+        const r = C * ring.age;
+        if (r < 1) continue;
+        ctx.beginPath();
+        ctx.strokeStyle = this.col(Math.min(0.9, ring.amp * 1.5));
+        ctx.lineWidth = 2.2;
+        ctx.arc(ring.x, ring.y, r, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      // nodes
+      for (let i = 0; i < this.nodes.length; i++) this.drawNode(i, this.nodes[i].e);
+      ctx.globalCompositeOperation = "source-over";
+    }
+  }
+
+  // ---------- wiring ----------
+  const loud   = new Sim(document.getElementById("c-loud"),   "loud");
+  const ripple = new Sim(document.getElementById("c-ripple"), "ripple");
+
+  const el = {
+    reachL: document.getElementById("reach-loud"),
+    durL:   document.getElementById("dur-loud"),
+    resL:   document.getElementById("res-loud"),
+    reachR: document.getElementById("reach-ripple"),
+    durR:   document.getElementById("dur-ripple"),
+    resR:   document.getElementById("res-ripple"),
+    capL:   document.getElementById("cap-loud"),
+    capR:   document.getElementById("cap-ripple"),
+    pondL:  document.getElementById("pond-loud"),
+    pondR:  document.getElementById("pond-ripple"),
+    play:   document.getElementById("play"),
+  };
+
+  const RES = r => Math.round(r * 100).toLocaleString();
+
+  function updateHUD(sim, r, d, res) {
+    r.textContent   = Math.round(sim.reach * 100) + "%";
+    d.textContent   = sim.duration.toFixed(1) + "s";
+    res.textContent = RES(sim.resonance);
+    const hot = sim.running || sim.resonance > 0;
+    r.classList.toggle("hot", hot);
+    res.classList.toggle("hot", hot);
+  }
+
+  const CAP_LOUD_DONE   = "Loud, brief, and local. The far shore never felt it.";
+  const CAP_RIPPLE_DONE = "It reached everyone — and kept ringing long after the shout went quiet.";
+
+  let last = performance.now();
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (dt > 0.05) dt = 0.05;   // clamp after tab-switches
+
+    loud.step(dt);
+    ripple.step(dt);
+    if (loud.running)   loud.draw();
+    if (ripple.running) ripple.draw();
+
+    updateHUD(loud,   el.reachL, el.durL, el.resL);
+    updateHUD(ripple, el.reachR, el.durR, el.resR);
+
+    // lead highlight once the ripple pulls ahead on resonance
+    el.pondR.classList.toggle("leading", ripple.resonance > loud.resonance * 1.15 && ripple.resonance > 5);
+
+    if (loud.done)   el.capL.textContent = CAP_LOUD_DONE;
+    if (ripple.done) el.capR.textContent = CAP_RIPPLE_DONE;
+
+    requestAnimationFrame(frame);
+  }
+
+  function playBoth() {
+    el.capL.textContent = "Blinding at the center. Spent by the time it reaches the edge.";
+    el.capR.textContent = "Faint at first — but every node it touches becomes a new source.";
+    loud.start();
+    ripple.start();
+  }
+
+  el.play.addEventListener("click", playBoth);
+  el.pondL.querySelector(".stage").addEventListener("click", () => { el.capL.textContent = "Blinding at the center. Spent by the time it reaches the edge."; loud.start(); });
+  el.pondR.querySelector(".stage").addEventListener("click", () => { el.capR.textContent = "Faint at first — but every node it touches becomes a new source."; ripple.start(); });
+
+  requestAnimationFrame(frame);
+
+  // autoplay once, unless the viewer prefers reduced motion
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduce) {
+    setTimeout(playBoth, 650);
+  } else {
+    el.play.textContent = "▶ Drop both stones";
+  }
+})();
+</script>
+</body>
+</html>
