@@ -171,6 +171,9 @@ body {
   align-items: center;
   gap: 8px;
 }
+#epic { border-color: var(--gold); font-size: 12px; line-height: 1.6; }
+#epic p, #epic ul { margin: 6px 0 0; }
+#epic .epic-hint { font-size: 10px; color: var(--muted); }
 .card-hd::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── CHECKLIST ── */
@@ -474,6 +477,8 @@ input[type="number"]:focus { border-color: var(--blue); }
 
 <!-- PANELS -->
 <div class="panels-wrap">
+
+<div class="card" id="epic" style="display:none;"></div>
 
   <!-- ═══════════════════════════════════════════════ PANEL 1: WELLS -->
   <div class="panel active" id="panel-1">
@@ -1011,5 +1016,7 @@ setSlider(15);
 const sl = document.getElementById('ptp-slider');
 sl.style.setProperty('accent-color','#c9943a');
 </script>
+<script src="../launch/smart.js"></script>
+<script src="epic.js"></script>
 </body>
 </html>
