@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="../theme.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PE Workup · Wells + PERC + D-Dimer iLR</title>
 <style>
@@ -26,6 +27,24 @@
   --step-done: #4caf82;
   --step-active: #c9943a;
   --step-todo: #2e3d55;
+  --masthead-top: #0d1520;
+  --on-accent: #000;
+  --marker: #fff;
+  --marker-glow: rgba(255,255,255,0.5);
+  --hover-tint: rgba(255,255,255,0.02);
+  --row-line: rgba(255,255,255,0.03);
+  --axis: #2e3d55;
+}
+/* Light theme, set by ../theme.js (the shared Clinical Tools toggle) */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6f9; --s1: #ffffff; --s2: #f3f5f9; --s3: #e9edf3;
+  --border: #d8dee7; --border2: #c3ccd8;
+  --gold: #a8681a; --gold2: #8a5512; --blue: #2f74b5; --red: #c0392b; --green: #2f8a5f; --yellow: #a8700f;
+  --text: #142033; --muted: #536175; --faint: #b4bfcd;
+  --step-done: #2f8a5f; --step-active: #a8681a; --step-todo: #c3ccd8;
+  --masthead-top: #e9eef5; --on-accent: #fff; --marker: #142033; --marker-glow: rgba(20,32,51,0.25);
+  --hover-tint: rgba(20,32,51,0.03); --row-line: rgba(20,32,51,0.07); --axis: #9aa6b6;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -40,7 +59,7 @@ body {
 
 /* ── HEADER ── */
 .masthead {
-  background: linear-gradient(180deg, #0d1520 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, var(--masthead-top) 0%, var(--bg) 100%);
   border-bottom: 1px solid var(--border);
   padding: 36px 28px 28px;
   max-width: 860px;
@@ -97,7 +116,7 @@ body {
   position: relative;
 }
 
-.step-tab:hover { background: rgba(255,255,255,0.02); }
+.step-tab:hover { background: var(--hover-tint); }
 
 .step-tab.active {
   border-bottom-color: var(--gold);
@@ -120,8 +139,8 @@ body {
   transition: all 0.2s;
 }
 
-.step-tab.active .step-num { background: var(--gold); color: #000; }
-.step-tab.done .step-num { background: var(--green); color: #000; }
+.step-tab.active .step-num { background: var(--gold); color: var(--on-accent); }
+.step-tab.done .step-num { background: var(--green); color: var(--on-accent); }
 
 .step-name {
   font-size: 9px;
@@ -211,7 +230,7 @@ body {
 .check-item.checked .check-box {
   background: var(--gold);
   border-color: var(--gold);
-  color: #000;
+  color: var(--on-accent);
 }
 
 .check-label { flex: 1; font-size: 11px; line-height: 1.4; color: var(--text); }
@@ -344,8 +363,8 @@ input[type="number"]:focus { border-color: var(--blue); }
 .p-bar { flex: 1; position: relative; height: 18px; background: linear-gradient(to right, var(--green), var(--yellow), var(--red)); border-radius: 4px; }
 .p-marker {
   position: absolute; top: -4px; width: 3px; height: 26px;
-  background: #fff; border-radius: 2px; transform: translateX(-50%);
-  box-shadow: 0 0 6px rgba(255,255,255,0.5);
+  background: var(--marker); border-radius: 2px; transform: translateX(-50%);
+  box-shadow: 0 0 6px var(--marker-glow);
   transition: left 0.4s cubic-bezier(0.4,0,0.2,1);
 }
 .p-pct { font-size: 11px; width: 44px; text-align: right; flex-shrink: 0; }
@@ -357,7 +376,7 @@ input[type="number"]:focus { border-color: var(--blue); }
   color: var(--muted); text-align: left;
   padding: 5px 10px 9px; border-bottom: 1px solid var(--border);
 }
-.ilr-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+.ilr-table td { padding: 8px 10px; border-bottom: 1px solid var(--row-line); vertical-align: middle; }
 .ilr-table tr.hit td { background: rgba(201,148,58,0.07); color: var(--gold); }
 
 .chip {
@@ -390,7 +409,7 @@ input[type="number"]:focus { border-color: var(--blue); }
   display: inline-flex; align-items: center; gap: 8px;
   margin-top: 6px;
   background: var(--gold);
-  color: #000;
+  color: var(--on-accent);
   font-family: 'DM Mono', monospace;
   font-size: 11px;
   font-weight: 500;
@@ -979,32 +998,33 @@ function drawFagan(prior, post) {
   }
   function el(tag,a){
     const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
-    Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v));
+    // Theme colors arrive as var(); presentation attributes can't resolve those, so set them as styles
+    Object.entries(a).forEach(([k,v])=>/^var\(/.test(v)?e.style.setProperty(k,v):e.setAttribute(k,v));
     return e;
   }
   function txt(x,y,s,anchor,col){
-    const t=el('text',{x,y,'text-anchor':anchor||'middle',fill:col||'#2e3d55','font-size':8,'font-family':'DM Mono,monospace'});
+    const t=el('text',{x,y,'text-anchor':anchor||'middle',fill:col||'var(--axis)','font-size':8,'font-family':'DM Mono,monospace'});
     t.textContent=s; svg.appendChild(t);
   }
 
-  svg.appendChild(el('line',{x1:xL,y1:pad,x2:xL,y2:H-pad,stroke:'#2e3d55','stroke-width':1}));
-  svg.appendChild(el('line',{x1:xR,y1:pad,x2:xR,y2:H-pad,stroke:'#2e3d55','stroke-width':1}));
-  txt(xL, pad-7, 'Pre (%)', 'middle', '#6e8099');
-  txt(xR, pad-7, 'Post (%)', 'middle', '#6e8099');
+  svg.appendChild(el('line',{x1:xL,y1:pad,x2:xL,y2:H-pad,stroke:'var(--axis)','stroke-width':1}));
+  svg.appendChild(el('line',{x1:xR,y1:pad,x2:xR,y2:H-pad,stroke:'var(--axis)','stroke-width':1}));
+  txt(xL, pad-7, 'Pre (%)', 'middle', 'var(--muted)');
+  txt(xR, pad-7, 'Post (%)', 'middle', 'var(--muted)');
 
   [0.01,0.02,0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95].forEach(p=>{
     const y=pY(p), pct=Math.round(p*100);
-    svg.appendChild(el('line',{x1:xL-3,y1:y,x2:xL,y2:y,stroke:'#2e3d55','stroke-width':1}));
-    txt(xL-5,y+3,pct,'end','#2e3d55');
-    svg.appendChild(el('line',{x1:xR,y1:y,x2:xR+3,y2:y,stroke:'#2e3d55','stroke-width':1}));
-    txt(xR+5,y+3,pct,'start','#2e3d55');
+    svg.appendChild(el('line',{x1:xL-3,y1:y,x2:xL,y2:y,stroke:'var(--axis)','stroke-width':1}));
+    txt(xL-5,y+3,pct,'end','var(--axis)');
+    svg.appendChild(el('line',{x1:xR,y1:y,x2:xR+3,y2:y,stroke:'var(--axis)','stroke-width':1}));
+    txt(xR+5,y+3,pct,'start','var(--axis)');
   });
 
   const yPre=pY(prior), yPost=pY(post);
-  const lc = post>0.40?'#e05a5a':post>0.15?'#d4a94a':'#4caf82';
+  const lc = post>0.40?'var(--red)':post>0.15?'var(--yellow)':'var(--green)';
 
   svg.appendChild(el('line',{x1:xL,y1:yPre,x2:xR,y2:yPost,stroke:lc,'stroke-width':1.5}));
-  svg.appendChild(el('circle',{cx:xL,cy:yPre,r:4,fill:'#4d9de0'}));
+  svg.appendChild(el('circle',{cx:xL,cy:yPre,r:4,fill:'var(--blue)'}));
   svg.appendChild(el('circle',{cx:xR,cy:yPost,r:4,fill:lc}));
 }
 
@@ -1014,7 +1034,7 @@ setSlider(15);
 
 // Slider thumb style
 const sl = document.getElementById('ptp-slider');
-sl.style.setProperty('accent-color','#c9943a');
+sl.style.setProperty('accent-color','var(--gold)');
 </script>
 <script src="../launch/smart.js"></script>
 <script src="epic.js"></script>
