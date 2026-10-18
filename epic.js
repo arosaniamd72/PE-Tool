@@ -114,7 +114,7 @@
       <p>${filled.map(esc).join(" · ") || "Nothing found to prefill."}</p>
       ${notes.length ? `<ul>${notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
       ${notes.some(n => n.includes(": 403")) ? `<p class="epic-hint">Permissions granted by Epic: ${esc(s.scope || "(none listed)")}</p>` : ""}
-      <p class="epic-hint">Check every item. DVT signs, "PE most likely", hemoptysis, leg swelling, and recent surgery or immobilization are not taken from the chart. <a href="../fhir/#trace" style="color:var(--gold)">How this launch worked</a></p>`;
+      <p class="epic-hint">Check every item. DVT signs, "PE most likely", hemoptysis, leg swelling, and recent surgery or immobilization are not taken from the chart. <a href="../fhir/#trace" style="color:var(--gold)">How this launch worked</a>${SMART.demo() ? ' · <a href="../fhir/?picker=1#try" style="color:var(--gold)">Try another patient</a>' : ""}</p>`;
   } catch (e) {
     box.innerHTML = `<div class="card-hd">Epic</div><p>Could not load chart data: ${esc(e.message)}. Enter values by hand.</p>`;
   }
